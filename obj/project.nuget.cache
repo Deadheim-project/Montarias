@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "okhHuXn0Pb73d9BFxLZUavSyhswIdePzg9Z4PCI2GqTPplBb7vRXsQ5H7UR4MW2F4zq9ALEzENFOJ8BcZvsIwA==",
+  "success": true,
+  "projectFilePath": "C:\\Users\\drthe\\OneDrive\\Área de Trabalho\\Valheim Mods\\montarias\\ValheimMontarias\\ValheimMontarias.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\drthe\\AppData\\Local\\Temp\\cursor-sandbox-cache\\36cb2a04d5a6faee4d172838df366f5b\\nuget\\microsoft.netframework.referenceassemblies\\1.0.3\\microsoft.netframework.referenceassemblies.1.0.3.nupkg.sha512",
+    "C:\\Users\\drthe\\AppData\\Local\\Temp\\cursor-sandbox-cache\\36cb2a04d5a6faee4d172838df366f5b\\nuget\\microsoft.netframework.referenceassemblies.net48\\1.0.3\\microsoft.netframework.referenceassemblies.net48.1.0.3.nupkg.sha512"
+  ],
+  "logs": []
+}

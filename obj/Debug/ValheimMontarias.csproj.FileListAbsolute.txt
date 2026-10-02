@@ -1,0 +1,32 @@
+c:\Users\Usuario\Desktop\Valheim Mods\montarias\ValheimMontarias\bin\Debug\ValheimMontarias.dll
+c:\Users\Usuario\Desktop\Valheim Mods\montarias\ValheimMontarias\bin\Debug\ValheimMontarias.pdb
+c:\Users\Usuario\Desktop\Valheim Mods\montarias\ValheimMontarias\obj\Debug\ValheimMontarias.csproj.AssemblyReference.cache
+c:\Users\Usuario\Desktop\Valheim Mods\montarias\ValheimMontarias\obj\Debug\ValheimMontarias.GeneratedMSBuildEditorConfig.editorconfig
+c:\Users\Usuario\Desktop\Valheim Mods\montarias\ValheimMontarias\obj\Debug\ValheimMontarias.csproj.CoreCompileInputs.cache
+c:\Users\Usuario\Desktop\Valheim Mods\montarias\ValheimMontarias\obj\Debug\ValheimMontarias.dll
+c:\Users\Usuario\Desktop\Valheim Mods\montarias\ValheimMontarias\obj\Debug\ValheimMontarias.pdb
+c:\Users\Usuario\Desktop\Valheim Mods\montarias\ValheimMontarias\bin\Debug\Assets\capybara.bin
+c:\Users\Usuario\Desktop\Valheim Mods\montarias\ValheimMontarias\bin\Debug\Assets\capybara.png
+c:\Users\Usuario\Desktop\Valheim Mods\montarias\ValheimMontarias\obj\Debug\ValheimMontarias.sourcelink.json
+c:\Users\Usuario\Desktop\Valheim Mods\montarias\ValheimMontarias\bin\Debug\Assets\capybara.skin
+c:\Users\Usuario\Desktop\Valheim Mods\montarias\ValheimMontarias\bin\Debug\Assets\centauro.bin
+c:\Users\Usuario\Desktop\Valheim Mods\montarias\ValheimMontarias\bin\Debug\Assets\centauro.png
+c:\Users\drthe\OneDrive\Área de Trabalho\Valheim Mods\montarias\ValheimMontarias\bin\Debug\Assets\capybara.bin
+c:\Users\drthe\OneDrive\Área de Trabalho\Valheim Mods\montarias\ValheimMontarias\bin\Debug\Assets\capybara.png
+c:\Users\drthe\OneDrive\Área de Trabalho\Valheim Mods\montarias\ValheimMontarias\bin\Debug\Assets\capybara.skin
+c:\Users\drthe\OneDrive\Área de Trabalho\Valheim Mods\montarias\ValheimMontarias\bin\Debug\Assets\centauro.bin
+c:\Users\drthe\OneDrive\Área de Trabalho\Valheim Mods\montarias\ValheimMontarias\bin\Debug\Assets\centauro.png
+c:\Users\drthe\OneDrive\Área de Trabalho\Valheim Mods\montarias\ValheimMontarias\bin\Debug\Assets\centauro.skin
+c:\Users\drthe\OneDrive\Área de Trabalho\Valheim Mods\montarias\ValheimMontarias\bin\Debug\ValheimMontarias.dll
+c:\Users\drthe\OneDrive\Área de Trabalho\Valheim Mods\montarias\ValheimMontarias\bin\Debug\ValheimMontarias.pdb
+c:\Users\drthe\OneDrive\Área de Trabalho\Valheim Mods\montarias\ValheimMontarias\obj\Debug\ValheimMontarias.csproj.AssemblyReference.cache
+c:\Users\drthe\OneDrive\Área de Trabalho\Valheim Mods\montarias\ValheimMontarias\obj\Debug\ValheimMontarias.GeneratedMSBuildEditorConfig.editorconfig
+c:\Users\drthe\OneDrive\Área de Trabalho\Valheim Mods\montarias\ValheimMontarias\obj\Debug\ValheimMontarias.csproj.CoreCompileInputs.cache
+c:\Users\drthe\OneDrive\Área de Trabalho\Valheim Mods\montarias\ValheimMontarias\obj\Debug\ValheimMontarias.dll
+c:\Users\drthe\OneDrive\Área de Trabalho\Valheim Mods\montarias\ValheimMontarias\obj\Debug\ValheimMontarias.pdb
+c:\Users\drthe\OneDrive\Área de Trabalho\Valheim Mods\montarias\ValheimMontarias\bin\Debug\Assets\_bones.npz
+c:\Users\drthe\OneDrive\Área de Trabalho\Valheim Mods\montarias\ValheimMontarias\bin\Debug\Assets\_mesh.npz
+C:\Users\drthe\OneDrive\Área de Trabalho\Valheim Mods\montarias\ValheimMontarias\bin\Debug\Assets\apito_capivara.png
+C:\Users\drthe\OneDrive\Área de Trabalho\Valheim Mods\montarias\ValheimMontarias\bin\Debug\Assets\apito_centauro.png
+C:\Users\drthe\OneDrive\Área de Trabalho\Valheim Mods\montarias\ValheimMontarias\bin\Debug\Assets\shop\Capivara_Shop.png
+C:\Users\drthe\OneDrive\Área de Trabalho\Valheim Mods\montarias\ValheimMontarias\bin\Debug\Assets\shop\Centauro_Shop.png

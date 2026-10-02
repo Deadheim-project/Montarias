@@ -1,0 +1,116 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>ValheimMontarias</AssemblyName>
+    <RootNamespace>ValheimMontarias</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="BepInEx">
+      <HintPath>$(BepInExCore)\BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(BepInExCore)\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="assembly_valheim">
+      <HintPath>$(ValheimPublicized)\assembly_valheim_publicized.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(ValheimManaged)\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="assembly_utils">
+      <HintPath>$(ValheimPublicized)\assembly_utils_publicized.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="assembly_guiutils">
+      <HintPath>$(ValheimManaged)\assembly_guiutils.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(ValheimManaged)\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(ValheimManaged)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>$(ValheimManaged)\UnityEngine.PhysicsModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(ValheimManaged)\UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.AnimationModule">
+      <HintPath>$(ValheimManaged)\UnityEngine.AnimationModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(ValheimManaged)\UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>$(ValheimManaged)\UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(ValheimManaged)\Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(ValheimManaged)\UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>$(ValheimManaged)\UnityEngine.UIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextCoreTextEngineModule">
+      <HintPath>$(ValheimManaged)\UnityEngine.TextCoreTextEngineModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+    <ItemGroup>
+      <None Include="Assets\**\*" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
+    <Target Name="CopyToPlugins" AfterTargets="Build">
+    <MakeDir Directories="$(BepInExPlugins)\ValheimMontarias" Condition="!Exists('$(BepInExPlugins)\ValheimMontarias')" />
+    <MakeDir Directories="$(BepInExPlugins)\ValheimMontarias\Assets" Condition="!Exists('$(BepInExPlugins)\ValheimMontarias\Assets')" />
+    <MakeDir Directories="$(BepInExPlugins)\ValheimMontarias\Assets\Shop" Condition="!Exists('$(BepInExPlugins)\ValheimMontarias\Assets\Shop')" />
+    <MakeDir Directories="$(BepInExPlugins)\ValheimMontarias\Assets\Menu" Condition="!Exists('$(BepInExPlugins)\ValheimMontarias\Assets\Menu')" />
+    <Copy SourceFiles="$(TargetDir)$(AssemblyName).dll" DestinationFolder="$(BepInExPlugins)\ValheimMontarias" ContinueOnError="true" Retries="1" RetryDelayMilliseconds="250" />
+    <ItemGroup>
+      <MountAsset Include="$(ProjectDir)Assets\*.bin;$(ProjectDir)Assets\*.png;$(ProjectDir)Assets\*.skin" />
+      <ShopAsset Include="$(ProjectDir)..\Assets\Shop\*.png;$(ProjectDir)Assets\shop\*.png;$(ProjectDir)Assets\Shop\*.png" />
+      <MenuAsset Include="$(ProjectDir)..\Assets\Menu\*.png;$(ProjectDir)Assets\Menu\*.png;$(ProjectDir)Assets\menu\*.png" />
+    </ItemGroup>
+    <Copy SourceFiles="@(MountAsset)"
+          DestinationFolder="$(BepInExPlugins)\ValheimMontarias\Assets"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(ProjectDir)Assets')" />
+    <Copy SourceFiles="@(ShopAsset)"
+          DestinationFolder="$(BepInExPlugins)\ValheimMontarias\Assets\Shop"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(MenuAsset)"
+          DestinationFolder="$(BepInExPlugins)\ValheimMontarias\Assets\Menu"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>
