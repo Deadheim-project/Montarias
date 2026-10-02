@@ -3,90 +3,52 @@ using System.Collections.Generic;
 namespace ValheimMontarias
 {
     /// <summary>
-    /// Which mounts a player owns: a comma-separated id list in Player.m_customData, which
-    /// the game saves in the character file. The player's ZDO is recreated on every login,
-    /// so a list kept only there was lost on relog; it is still read once and migrated.
-    /// LiberarTodasGratis grants everything.
+    /// What the local player may summon, WoW style: the riding skill at the level the mount
+    /// asks for (<see cref="MountProfile.MinRank"/>) and the mount itself. Both are the
+    /// server's record (<see cref="RiderServer"/>), as the client last heard it
+    /// (<see cref="RiderClient"/>); they are sold by NpcValheim's Mestre das Montarias.
+    /// LiberarTodasGratis grants every level and every mount.
     /// </summary>
     internal static class MountRoster
     {
-        private const string Key = "vm_owned";
+        public static bool UnlockAll => MountSettings.UnlockAll != null && MountSettings.UnlockAll.Value;
 
-        public static bool Owns(Player player, MountProfile profile)
-        {
-            if (player == null || profile == null) return false;
-            if (MountSettings.UnlockAll != null && MountSettings.UnlockAll.Value)
-                return true;
-            return OwnedIds(player).Contains(profile.Id);
-        }
+        /// <summary>Whether there is anything to go by yet.</summary>
+        public static bool Known => UnlockAll || RiderClient.Known;
 
-        public static List<MountProfile> Owned(Player player)
+        public static int Rank => UnlockAll ? RidingRanks.Count : RiderClient.Rank;
+
+        public static float SpeedBonus => RidingRanks.SpeedOf(Rank);
+
+        public static bool Owns(MountProfile profile) =>
+            profile != null && (UnlockAll || RiderClient.Owns(profile.Id));
+
+        public static bool CanRide(MountProfile profile) => profile != null && Rank >= profile.MinRank;
+
+        public static bool Usable(MountProfile profile) => Owns(profile) && CanRide(profile);
+
+        public static List<MountProfile> UsableMounts()
         {
             var list = new List<MountProfile>();
             var all = MountSettings.All;
             if (all == null) return list;
             for (int i = 0; i < all.Length; i++)
             {
-                if (Owns(player, all[i]))
+                if (Usable(all[i]))
                     list.Add(all[i]);
             }
             return list;
         }
 
-        public static void Grant(Player player, MountProfile profile)
+        /// <summary>Why a mount cannot be summoned right now, or null when it can.</summary>
+        public static string Blocker(MountProfile profile)
         {
-            if (player == null || profile == null) return;
-            var ids = OwnedIds(player);
-            if (!ids.Add(profile.Id)) return;
-            Save(player, ids);
-        }
-
-        private static HashSet<string> OwnedIds(Player player)
-        {
-            var ids = new HashSet<string>();
-            string raw = null;
-            var data = CustomData(player);
-            if (data != null)
-                data.TryGetValue(Key, out raw);
-            if (string.IsNullOrEmpty(raw))
-            {
-                var zdo = ZdoOf(player);
-                raw = zdo != null ? zdo.GetString(Key, "") : "";
-                if (!string.IsNullOrEmpty(raw) && data != null)
-                    data[Key] = raw;
-            }
-            if (string.IsNullOrEmpty(raw)) return ids;
-            var parts = raw.Split(',');
-            for (int i = 0; i < parts.Length; i++)
-            {
-                string id = parts[i].Trim();
-                if (id.Length > 0) ids.Add(id);
-            }
-            return ids;
-        }
-
-        private static void Save(Player player, HashSet<string> ids)
-        {
-            string raw = string.Join(",", ids);
-            var data = CustomData(player);
-            if (data != null)
-                data[Key] = raw;
-            var zdo = ZdoOf(player);
-            if (zdo != null)
-                zdo.Set(Key, raw);
-        }
-
-        private static IDictionary<string, string> CustomData(Player player)
-        {
-            return Access.Get(player, "m_customData") as IDictionary<string, string>;
-        }
-
-        private static ZDO ZdoOf(Player player)
-        {
-            if (player == null) return null;
-            var nview = player.GetComponent<ZNetView>();
-            if (nview == null || !nview.IsValid()) return null;
-            return nview.GetZDO();
+            if (profile == null) return "Você ainda não possui nenhuma montaria. Procure o Mestre das Montarias.";
+            if (!Known) return "Consultando o servidor, tente de novo em instantes.";
+            if (!Owns(profile)) return $"Você não possui {profile.Name}. Procure o Mestre das Montarias.";
+            if (!CanRide(profile))
+                return $"{profile.Name} exige a habilidade {RidingRanks.NameOf(profile.MinRank)}. Aprenda com o Mestre das Montarias.";
+            return null;
         }
     }
 }

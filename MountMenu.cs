@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using BepInEx;
+using BepInEx.Configuration;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -12,25 +13,48 @@ using ValheimMontarias.UI;
 
 namespace ValheimMontarias
 {
+    /// <summary>
+    /// The mount menu (U), built as the same window NpcValheim uses for its NPCs: the wooden
+    /// frame, the title bar you drag it by, the tab strip, the inlays and the yellow status line,
+    /// at the same sizes, so it reads as part of the same game.
+    ///
+    /// Tabs: Montarias (the mount journal: everything that exists, what you can summon, what
+    /// you are missing), Habilidade (the riding skill levels) and, for admins, Admin. What you
+    /// own and know is the server's record (RiderClient); the menu redraws when it changes.
+    /// </summary>
     internal sealed class MountMenu : MonoBehaviour
     {
-        private enum Tab { Mine, Admin }
+        private enum Tab { Journal, Skill, Admin }
+
+        private const float Width = 940f;
+        private const float Height = 640f;
+        private const string SkillIcon = "SaddleLox";
 
         private static MountMenu _instance;
+
         private GameObject _canvas;
-        private RectTransform _mineRoot;
-        private RectTransform _mineList;
+        private TextMeshProUGUI _status;
+        private RectTransform _tabStrip;
+        private RectTransform _content;
+        private readonly List<(Button button, Tab tab)> _tabs = new List<(Button, Tab)>();
+
+        private RectTransform _journalRoot;
+        private RectTransform _journalList;
+        private RectTransform _journalDetail;
+        private RectTransform _skillRoot;
+        private RectTransform _skillList;
+        private TextMeshProUGUI _skillSummary;
         private RectTransform _adminRoot;
         private RectTransform _adminList;
         private RectTransform _adminEditor;
-        private TextMeshProUGUI _status;
-        private TextMeshProUGUI _header;
-        private readonly List<Button> _tabButtons = new List<Button>();
-        private readonly List<GameObject> _spawned = new List<GameObject>();
+
         private readonly Dictionary<string, Sprite> _icons = new Dictionary<string, Sprite>();
         private bool _open;
-        private Tab _tab = Tab.Mine;
+        private Tab _tab = Tab.Journal;
+        private MountProfile _focus;
         private MountProfile _adminProfile;
+        private int _seenRevision = -1;
+        private int _seenMessage;
 
         public static bool IsOpen => _instance != null && _instance._open;
         public static bool AdminTabOpen => IsOpen && _instance._tab == Tab.Admin;
@@ -47,35 +71,37 @@ namespace ValheimMontarias
         {
             if (_instance == null) return;
             if (_instance._open) _instance.CloseInternal();
-            else _instance.OpenInternal(Tab.Mine);
+            else _instance.OpenInternal(Tab.Journal);
         }
 
-        public static void Open() => _instance?.OpenInternal(Tab.Mine);
+        public static void Open() => _instance?.OpenInternal(Tab.Journal);
 
         public static void OpenAdmin(MountProfile profile = null) =>
             _instance?.OpenInternal(Tab.Admin, profile);
 
         public static void Close() => _instance?.CloseInternal();
 
+        /// <summary>The mount H summons: the one chosen in the menu if it can be summoned, else
+        /// the first that can, else the chosen one anyway so H explains what is missing.</summary>
         public static MountProfile Selected()
         {
-            var owned = MountRoster.Owned(Player.m_localPlayer);
-            if (owned.Count == 0) return null;
-            string id = MountSettings.SelectedMount != null ? MountSettings.SelectedMount.Value : null;
-            for (int i = 0; i < owned.Count; i++)
-            {
-                if (owned[i] != null && owned[i].Id == id)
-                    return owned[i];
-            }
-            return owned[0];
+            var chosen = MountSettings.ById(MountSettings.SelectedMount != null ? MountSettings.SelectedMount.Value : null);
+            if (MountRoster.Usable(chosen)) return chosen;
+            var usable = MountRoster.UsableMounts();
+            if (usable.Count > 0) return usable[0];
+            if (chosen != null) return chosen;
+            var all = MountSettings.All;
+            return all != null && all.Length > 0 ? all[0] : null;
         }
 
         public static void Select(MountProfile profile)
         {
             if (profile == null || MountSettings.SelectedMount == null) return;
             MountSettings.SelectedMount.Value = profile.Id;
-            _instance?.RebuildMine();
+            _instance?.Redraw();
         }
+
+        // ---- lifetime ----
 
         private void Update()
         {
@@ -107,6 +133,17 @@ namespace ValheimMontarias
                 return;
             }
 
+            if (_seenRevision != RiderClient.Revision)
+            {
+                _seenRevision = RiderClient.Revision;
+                Redraw();
+            }
+            if (_seenMessage != RiderClient.MessageRevision)
+            {
+                _seenMessage = RiderClient.MessageRevision;
+                Say(RiderClient.LastMessage);
+            }
+
             if (!Typing() && Input.GetKeyDown(KeyCode.Escape))
                 CloseInternal();
         }
@@ -125,7 +162,7 @@ namespace ValheimMontarias
             {
                 Player.m_localPlayer.Message(MessageHud.MessageType.Center, "Apenas administradores.");
                 if (!_open) return;
-                tab = Tab.Mine;
+                tab = Tab.Journal;
             }
 
             if (!_open)
@@ -145,97 +182,91 @@ namespace ValheimMontarias
 
                 BuildWindow();
                 _open = true;
+                _seenMessage = RiderClient.MessageRevision;
+                RiderClient.Request(true);
             }
 
             _adminProfile = adminProfile ?? _adminProfile ?? MountSettings.Javali;
+            _focus ??= Selected();
             SetTab(tab);
         }
 
+        private void CloseInternal()
+        {
+            if (!_open) return;
+            _open = false;
+            _tab = Tab.Journal;
+            _tabs.Clear();
+            _journalRoot = _journalList = _journalDetail = null;
+            _skillRoot = _skillList = null;
+            _skillSummary = null;
+            _adminRoot = _adminList = _adminEditor = null;
+            _status = null;
+            if (_canvas != null) Destroy(_canvas);
+            _canvas = null;
+
+            if (InventoryGui.instance != null && InventoryGui.IsVisible()) return;
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
+
+        // ---- the window (NpcValheim's NpcWindow, measure for measure) ----
+
         private void BuildWindow()
         {
-            var panel = ValheimUi.CreatePanel(_canvas.transform, 940f, 640f);
+            var panel = ValheimUi.CreatePanel(_canvas.transform, Width, Height);
             panel.anchorMin = panel.anchorMax = new Vector2(0.5f, 0.5f);
             panel.anchoredPosition = Vector2.zero;
 
             var titleBar = ValheimUi.CreateRect("TitleBar", panel);
             ValheimUi.Anchor(titleBar, new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(0f, -56f), Vector2.zero);
+                new Vector2(0f, -58f), Vector2.zero);
             titleBar.gameObject.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0f);
             titleBar.gameObject.AddComponent<DragWindow>().Target = panel;
 
-            _header = ValheimUi.CreateLabel(titleBar, "Montarias", 28, ValheimUi.Orange,
+            var title = ValheimUi.CreateLabel(titleBar, "Montarias", 30, ValheimUi.Orange,
                 TextAlignmentOptions.Center, display: true);
-            ValheimUi.Stretch((RectTransform)_header.transform, 60f, 8f);
+            ValheimUi.Stretch((RectTransform)title.transform, 60f, 10f);
 
             var close = ValheimUi.CreateButton(panel, "X", 36f, 36f, 18);
             ValheimUi.Anchor((RectTransform)close.transform, new Vector2(1f, 1f), new Vector2(1f, 1f),
                 new Vector2(-52f, -52f), new Vector2(-16f, -16f));
             close.onClick.AddListener(CloseInternal);
 
-            var tabStrip = ValheimUi.CreateRect("Tabs", panel);
-            ValheimUi.Anchor(tabStrip, new Vector2(0f, 1f), new Vector2(1f, 1f),
+            _tabStrip = ValheimUi.CreateRect("Tabs", panel);
+            ValheimUi.Anchor(_tabStrip, new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(24f, -104f), new Vector2(-24f, -60f));
-            var strip = tabStrip.gameObject.AddComponent<HorizontalLayoutGroup>();
+            var strip = _tabStrip.gameObject.AddComponent<HorizontalLayoutGroup>();
             strip.spacing = 8f;
             strip.childControlWidth = true;
             strip.childControlHeight = true;
             strip.childForceExpandWidth = false;
             strip.childAlignment = TextAnchor.MiddleLeft;
 
-            _tabButtons.Clear();
-            AddTab(tabStrip, "Minhas Montarias", Tab.Mine, 230f);
-            AddTab(tabStrip, "Admin", Tab.Admin, 120f);
-
-            var content = ValheimUi.CreateRect("Content", panel);
-            ValheimUi.Anchor(content, Vector2.zero, Vector2.one,
+            _content = ValheimUi.CreateRect("Content", panel);
+            ValheimUi.Anchor(_content, Vector2.zero, Vector2.one,
                 new Vector2(24f, 52f), new Vector2(-24f, -110f));
 
-            _mineRoot = BuildMine(content);
-            _adminRoot = BuildAdmin(content);
-
-            _status = ValheimUi.CreateLabel(panel, HintText(), 14, ValheimUi.Muted, TextAlignmentOptions.Center);
+            _status = ValheimUi.CreateLabel(panel, HintText(), 15, ValheimUi.Yellow, TextAlignmentOptions.Left);
             ValheimUi.Anchor((RectTransform)_status.transform, new Vector2(0f, 0f), new Vector2(1f, 0f),
                 new Vector2(26f, 14f), new Vector2(-26f, 44f));
+
+            _tabs.Clear();
+            AddTab("Montarias", Tab.Journal);
+            AddTab("Habilidade", Tab.Skill);
+            if (Access.IsAdmin())
+                AddTab("Admin", Tab.Admin);
+
+            _journalRoot = BuildJournal(_content);
+            _skillRoot = BuildSkill(_content);
+            _adminRoot = BuildAdmin(_content);
         }
 
-        private void AddTab(Transform parent, string label, Tab tab, float width)
+        private void AddTab(string label, Tab tab)
         {
-            var button = ValheimUi.CreateButton(parent, label, width, 40f, 16);
+            var button = ValheimUi.CreateButton(_tabStrip, label, 150f, 40f, 16);
             button.onClick.AddListener(() => SetTab(tab));
-            _tabButtons.Add(button);
-        }
-
-        private RectTransform BuildMine(Transform parent)
-        {
-            var root = ValheimUi.CreateRect("Mine", parent);
-            ValheimUi.Stretch(root, 0f, 0f);
-
-            var frame = ValheimUi.CreateInlay(root, "MineFrame");
-            ValheimUi.Stretch(frame, 0f, 0f);
-
-            var area = ValheimUi.CreateRect("Area", frame);
-            ValheimUi.Anchor(area, Vector2.zero, Vector2.one, new Vector2(6f, 6f), new Vector2(-6f, -6f));
-            _mineList = ValheimUi.CreateScrollList(area, spacing: 6f);
-            return root;
-        }
-
-        private RectTransform BuildAdmin(Transform parent)
-        {
-            var root = ValheimUi.CreateRect("Admin", parent, false);
-            ValheimUi.Stretch(root, 0f, 0f);
-
-            var frame = ValheimUi.CreateInlay(root, "AdminFrame");
-            ValheimUi.Stretch(frame, 0f, 0f);
-
-            var left = ValheimUi.CreateRect("List", frame);
-            ValheimUi.Anchor(left, new Vector2(0f, 0f), new Vector2(0f, 1f),
-                new Vector2(10f, 10f), new Vector2(250f, -10f));
-            _adminList = ValheimUi.CreateScrollList(left, spacing: 6f);
-
-            var right = ValheimUi.CreateRect("Editor", frame);
-            ValheimUi.Anchor(right, Vector2.zero, Vector2.one, new Vector2(258f, 10f), new Vector2(-10f, -10f));
-            _adminEditor = ValheimUi.CreateScrollList(right, spacing: 8f);
-            return root;
+            _tabs.Add((button, tab));
         }
 
         private void SetTab(Tab tab)
@@ -243,83 +274,260 @@ namespace ValheimMontarias
             if (tab == Tab.Admin && !Access.IsAdmin())
             {
                 Say("Apenas administradores.");
-                tab = Tab.Mine;
+                tab = Tab.Journal;
             }
 
             _tab = tab;
-            if (_mineRoot != null) _mineRoot.gameObject.SetActive(tab == Tab.Mine);
+            if (_journalRoot != null) _journalRoot.gameObject.SetActive(tab == Tab.Journal);
+            if (_skillRoot != null) _skillRoot.gameObject.SetActive(tab == Tab.Skill);
             if (_adminRoot != null) _adminRoot.gameObject.SetActive(tab == Tab.Admin);
 
-            for (int i = 0; i < _tabButtons.Count; i++)
+            // Valheim keeps the active tab lit and dims the others.
+            foreach (var (button, which) in _tabs)
             {
-                var button = _tabButtons[i];
-                bool on = (Tab)i == tab;
+                bool on = which == tab;
                 var text = button.GetComponentInChildren<TextMeshProUGUI>();
                 if (text != null) text.color = on ? ValheimUi.Yellow : ValheimUi.Orange;
                 if (button.image != null)
                     button.image.color = on ? Color.white : new Color(0.72f, 0.72f, 0.72f, 1f);
             }
 
-            if (_header != null)
-            {
-                _header.text = tab == Tab.Mine ? "Minhas Montarias" : "Admin";
-            }
-
-            if (tab == Tab.Mine) RebuildMine();
-            else RebuildAdmin();
+            Redraw();
             Say(HintText());
         }
 
-        private void RebuildMine()
+        private void Redraw()
         {
-            ClearChildren(_mineList);
-            var player = Player.m_localPlayer;
-            var owned = MountRoster.Owned(player);
+            if (!_open) return;
+            if (_tab == Tab.Journal) RebuildJournal();
+            else if (_tab == Tab.Skill) RebuildSkill();
+            else RebuildAdmin();
+        }
 
-            if (owned.Count == 0)
+        // ---- Montarias: the journal ----
+
+        private RectTransform BuildJournal(Transform parent)
+        {
+            var root = ValheimUi.CreateRect("Journal", parent);
+            ValheimUi.Stretch(root, 0f, 0f);
+
+            var left = ValheimUi.CreateInlay(root, "List");
+            ValheimUi.Anchor(left, Vector2.zero, new Vector2(0f, 1f), Vector2.zero, new Vector2(320f, 0f));
+            var area = ValheimUi.CreateRect("Area", left);
+            ValheimUi.Anchor(area, Vector2.zero, Vector2.one, new Vector2(4f, 4f), new Vector2(-4f, -4f));
+            _journalList = ValheimUi.CreateScrollList(area, spacing: 4f);
+
+            _journalDetail = ValheimUi.CreateInlay(root, "Detail");
+            ValheimUi.Anchor(_journalDetail, Vector2.zero, Vector2.one, new Vector2(332f, 0f), Vector2.zero);
+            return root;
+        }
+
+        private void RebuildJournal()
+        {
+            ClearChildren(_journalList);
+            var all = MountSettings.All;
+            if (all == null || _journalList == null) return;
+
+            var selected = Selected();
+            if (_focus == null) _focus = selected;
+            foreach (var profile in all)
             {
-                var empty = ValheimUi.CreateLabel(_mineList,
-                    "Você ainda não possui nenhuma montaria.",
-                    18, ValheimUi.Beige, TextAlignmentOptions.Center);
-                ValheimUi.SetHeight(empty.gameObject, 80f);
-            }
-            else
-            {
-                var selected = Selected();
-                for (int i = 0; i < owned.Count; i++)
+                if (profile == null) continue;
+                var row = ValheimUi.CreateButton(_journalList, "", 0f, 64f, 16);
+                row.onClick.AddListener(() =>
                 {
-                    var profile = owned[i];
-                    if (profile == null) continue;
-                    var button = ValheimUi.CreateButton(_mineList, "", 0f, 72f, 18);
-                    button.onClick.AddListener(() => Select(profile));
-                    Track(button.gameObject);
-                    if (button.image != null)
-                        button.image.color = profile == selected ? Color.white : new Color(0.72f, 0.72f, 0.72f, 1f);
+                    _focus = profile;
+                    RebuildJournal();
+                });
+                if (row.image != null)
+                    row.image.color = profile == _focus ? Color.white : new Color(0.72f, 0.72f, 0.72f, 1f);
 
-                    var icon = ValheimUi.CreateRect("Icon", button.transform);
-                    ValheimUi.Anchor(icon, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
-                        new Vector2(8f, -28f), new Vector2(64f, 28f));
-                    var image = icon.gameObject.AddComponent<Image>();
-                    image.preserveAspect = true;
-                    image.raycastTarget = false;
-                    image.sprite = IconOf(profile.IconFile);
-                    image.enabled = image.sprite != null;
+                var icon = ValheimUi.CreateRect("Icon", row.transform);
+                ValheimUi.Anchor(icon, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
+                    new Vector2(8f, -24f), new Vector2(56f, 24f));
+                var image = icon.gameObject.AddComponent<Image>();
+                image.preserveAspect = true;
+                image.raycastTarget = false;
+                image.sprite = IconOf(profile.IconFile);
+                image.enabled = image.sprite != null;
+                if (!MountRoster.Usable(profile)) image.color = new Color(0.55f, 0.55f, 0.55f, 1f);
 
-                    var label = button.GetComponentInChildren<TextMeshProUGUI>();
-                    if (label != null)
-                    {
-                        ValheimUi.Anchor((RectTransform)label.transform, Vector2.zero, Vector2.one,
-                            new Vector2(76f, 4f), new Vector2(-12f, -4f));
-                        label.alignment = TextAlignmentOptions.Left;
-                        label.text = profile == selected ? $"{profile.Name}   (selecionada)" : profile.Name;
-                        label.color = ValheimUi.Beige;
-                    }
+                var label = row.GetComponentInChildren<TextMeshProUGUI>();
+                if (label != null)
+                {
+                    ValheimUi.Anchor((RectTransform)label.transform, Vector2.zero, Vector2.one,
+                        new Vector2(64f, 4f), new Vector2(-8f, -4f));
+                    label.alignment = TextAlignmentOptions.Left;
+                    label.color = ValheimUi.Beige;
+                    label.text = $"{profile.Name}\n<size=12><color=#9a9188>{StateOf(profile, selected)}</color></size>";
                 }
             }
+
+            RebuildDetail(selected);
+        }
+
+        private void RebuildDetail(MountProfile selected)
+        {
+            ClearChildren(_journalDetail);
+            var profile = _focus;
+            if (profile == null || _journalDetail == null) return;
+
+            var art = ValheimUi.CreateRect("Art", _journalDetail);
+            ValheimUi.Anchor(art, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(16f, -176f), new Vector2(176f, -16f));
+            var image = art.gameObject.AddComponent<Image>();
+            image.preserveAspect = true;
+            image.raycastTarget = false;
+            image.sprite = IconOf(profile.IconFile);
+            image.enabled = image.sprite != null;
+
+            var name = ValheimUi.CreateLabel(_journalDetail, profile.Name, 26, ValheimUi.Orange,
+                TextAlignmentOptions.TopLeft, display: true);
+            ValheimUi.Anchor((RectTransform)name.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(192f, -56f), new Vector2(-16f, -16f));
+
+            var state = ValheimUi.CreateLabel(_journalDetail, StateOf(profile, selected), 16, ValheimUi.Yellow,
+                TextAlignmentOptions.TopLeft);
+            ValheimUi.Anchor((RectTransform)state.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(192f, -84f), new Vector2(-16f, -58f));
+
+            float bonus = MountRoster.SpeedBonus;
+            var stats = ValheimUi.CreateLabel(_journalDetail,
+                $"Habilidade exigida: {RidingRanks.NameOf(profile.MinRank)}\n" +
+                $"Velocidade: {Value(profile.RunSpeed) * bonus:0.#}" +
+                (bonus > 1.001f ? $" <color=#9a9188>(+{(bonus - 1f) * 100f:0}% da sua habilidade)</color>" : "") + "\n" +
+                $"Vida: {Value(profile.MaxHealth):0}   Stamina: {Value(profile.MaxStamina):0}\n" +
+                "Montado: Espaço salta, clique dá uma investida.",
+                15, ValheimUi.Beige, TextAlignmentOptions.TopLeft);
+            ValheimUi.Anchor((RectTransform)stats.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(192f, -200f), new Vector2(-16f, -92f));
+
+            string blocker = MountRoster.Blocker(profile);
+            if (blocker != null)
+            {
+                var hint = ValheimUi.CreateLabel(_journalDetail, blocker, 15, ValheimUi.Muted, TextAlignmentOptions.TopLeft);
+                ValheimUi.Anchor((RectTransform)hint.transform, new Vector2(0f, 0f), new Vector2(1f, 0f),
+                    new Vector2(16f, 64f), new Vector2(-16f, 120f));
+                return;
+            }
+
+            var summon = ValheimUi.CreateButton(_journalDetail, IsSummoned(profile) ? "Recolher" : "Invocar", 150f, 40f, 16);
+            ValheimUi.Anchor((RectTransform)summon.transform, new Vector2(1f, 0f), new Vector2(1f, 0f),
+                new Vector2(-166f, 16f), new Vector2(-16f, 56f));
+            summon.onClick.AddListener(() =>
+            {
+                CloseInternal();
+                JavaliControl.TrySummonProfile(Player.m_localPlayer, profile);
+            });
+
+            bool onKey = profile == selected;
+            var choose = ValheimUi.CreateButton(_journalDetail,
+                onKey ? $"Já está no {SummonKeyName()}" : $"Usar no {SummonKeyName()}", 170f, 40f, 16);
+            ValheimUi.Anchor((RectTransform)choose.transform, new Vector2(1f, 0f), new Vector2(1f, 0f),
+                new Vector2(-344f, 16f), new Vector2(-174f, 56f));
+            choose.interactable = !onKey;
+            choose.onClick.AddListener(() =>
+            {
+                Select(profile);
+                Say($"{SummonKeyName()} agora invoca {profile.Name}.");
+            });
+        }
+
+        private static string StateOf(MountProfile profile, MountProfile selected)
+        {
+            if (!MountRoster.Known) return "Consultando o servidor...";
+            if (!MountRoster.Owns(profile)) return "Não possui · à venda no Mestre das Montarias";
+            if (!MountRoster.CanRide(profile)) return $"Exige {RidingRanks.NameOf(profile.MinRank)}";
+            return profile == selected ? $"Pronta · no {SummonKeyName()}" : "Pronta";
+        }
+
+        private static bool IsSummoned(MountProfile profile) =>
+            JavaliControl.FindOwned(Player.m_localPlayer, profile.IsInstance) != null;
+
+        // ---- Habilidade ----
+
+        private RectTransform BuildSkill(Transform parent)
+        {
+            var root = ValheimUi.CreateRect("Skill", parent, false);
+            ValheimUi.Stretch(root, 0f, 0f);
+
+            _skillSummary = ValheimUi.CreateLabel(root, "", 18, ValheimUi.Yellow, TextAlignmentOptions.Center);
+            ValheimUi.Anchor((RectTransform)_skillSummary.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(0f, -30f), Vector2.zero);
+
+            var pane = ValheimUi.CreateInlay(root, "Levels");
+            ValheimUi.Anchor(pane, Vector2.zero, Vector2.one, new Vector2(0f, 48f), new Vector2(0f, -40f));
+            var header = ValheimUi.CreateLabel(pane, "Habilidade de Montaria", 18, ValheimUi.Orange,
+                TextAlignmentOptions.Center, display: true);
+            ValheimUi.Anchor((RectTransform)header.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(6f, -36f), new Vector2(-6f, -6f));
+            var area = ValheimUi.CreateRect("Area", pane);
+            ValheimUi.Anchor(area, Vector2.zero, Vector2.one, new Vector2(4f, 4f), new Vector2(-4f, -38f));
+            _skillList = ValheimUi.CreateScrollList(area, spacing: 4f);
+
+            var footer = ValheimUi.CreateLabel(root,
+                "Aprenda com o Mestre das Montarias. Cada montaria exige um nível; os níveis acima " +
+                "deixam todas as suas montarias mais rápidas.",
+                14, ValheimUi.Muted, TextAlignmentOptions.Center);
+            ValheimUi.Anchor((RectTransform)footer.transform, Vector2.zero, new Vector2(1f, 0f),
+                Vector2.zero, new Vector2(0f, 42f));
+            return root;
+        }
+
+        private void RebuildSkill()
+        {
+            if (_skillList == null) return;
+            ClearChildren(_skillList);
+
+            int rank = MountRoster.Rank;
+            _skillSummary.text = !MountRoster.Known
+                ? "<color=#9a9188>Consultando o servidor...</color>"
+                : rank <= 0
+                    ? "Você ainda não sabe montar."
+                    : $"<color=#9a9188>Sua habilidade:</color> {RidingRanks.NameOf(rank)} " +
+                      $"<color=#9a9188>(velocidade {RidingRanks.SpeedOf(rank) * 100f:0}%)</color>";
+
+            foreach (var level in RidingRanks.All)
+            {
+                var row = Row(_skillList, 52f);
+                ValheimUi.CreateItemIcon(row, SkillIcon, 36f);
+                var label = ValheimUi.CreateLabel(row,
+                    $"{level.Name}\n<size=12><color=#9a9188>velocidade {level.Speed * 100f:0}%</color></size>",
+                    16, ValheimUi.Beige, TextAlignmentOptions.Left);
+                Flexible(label.gameObject);
+
+                bool learned = level.Level <= rank;
+                bool next = level.Level == rank + 1;
+                var tag = ValheimUi.CreateLabel(row, learned ? "Aprendida" : next ? "Próxima" : "Bloqueada", 15,
+                    learned ? ValheimUi.Yellow : next ? ValheimUi.Orange : ValheimUi.Muted,
+                    TextAlignmentOptions.Right);
+                ValheimUi.SetWidth(tag.gameObject, 140f);
+            }
+        }
+
+        // ---- Admin ----
+
+        private RectTransform BuildAdmin(Transform parent)
+        {
+            var root = ValheimUi.CreateRect("Admin", parent, false);
+            ValheimUi.Stretch(root, 0f, 0f);
+
+            var left = ValheimUi.CreateInlay(root, "List");
+            ValheimUi.Anchor(left, Vector2.zero, new Vector2(0f, 1f), Vector2.zero, new Vector2(240f, 0f));
+            var listArea = ValheimUi.CreateRect("Area", left);
+            ValheimUi.Anchor(listArea, Vector2.zero, Vector2.one, new Vector2(4f, 4f), new Vector2(-4f, -4f));
+            _adminList = ValheimUi.CreateScrollList(listArea, spacing: 6f);
+
+            var right = ValheimUi.CreateInlay(root, "Editor");
+            ValheimUi.Anchor(right, Vector2.zero, Vector2.one, new Vector2(252f, 0f), Vector2.zero);
+            var editorArea = ValheimUi.CreateRect("Area", right);
+            ValheimUi.Anchor(editorArea, Vector2.zero, Vector2.one, new Vector2(4f, 4f), new Vector2(-4f, -4f));
+            _adminEditor = ValheimUi.CreateScrollList(editorArea, spacing: 8f);
+            return root;
         }
 
         private void RebuildAdmin()
         {
+            if (_adminList == null) return;
             ClearChildren(_adminList);
             ClearChildren(_adminEditor);
 
@@ -331,24 +539,20 @@ namespace ValheimMontarias
                 return;
             }
 
-            var unlock = ValheimUi.CreateButton(_adminList,
-                UnlockLabel(), 0f, 42f, 14);
+            var unlock = ValheimUi.CreateButton(_adminList, UnlockLabel(), 0f, 42f, 14);
             unlock.onClick.AddListener(() =>
             {
                 if (MountSettings.UnlockAll != null)
                     MountSettings.UnlockAll.Value = !MountSettings.UnlockAll.Value;
+                MountHub.ApplySpeedAll();
                 RebuildAdmin();
-                RebuildMine();
             });
-            Track(unlock.gameObject);
 
             var all = MountSettings.All;
             if (all == null) return;
             if (_adminProfile == null) _adminProfile = all.Length > 0 ? all[0] : null;
-
-            for (int i = 0; i < all.Length; i++)
+            foreach (var profile in all)
             {
-                var profile = all[i];
                 if (profile == null) continue;
                 var button = ValheimUi.CreateButton(_adminList, profile.DefaultName, 0f, 40f, 15);
                 button.onClick.AddListener(() =>
@@ -358,16 +562,15 @@ namespace ValheimMontarias
                 });
                 if (button.image != null)
                     button.image.color = profile == _adminProfile ? Color.white : new Color(0.72f, 0.72f, 0.72f, 1f);
-                Track(button.gameObject);
             }
 
             var selected = _adminProfile;
             if (selected == null) return;
 
             Heading("Nome");
-            var nameRow = Row(40f);
+            var nameRow = Row(_adminEditor, 40f);
             var nameField = ValheimUi.CreateInputField(nameRow, selected.Name, 200f, 38f);
-            Flex(nameField.gameObject);
+            Flexible(nameField.gameObject);
             var rename = ValheimUi.CreateButton(nameRow, "Renomear", 120f, 38f, 14);
             rename.onClick.AddListener(() =>
             {
@@ -383,16 +586,7 @@ namespace ValheimMontarias
             AddStat("Vida", selected.MaxHealth, 10f, 1000f);
             AddStat("Stamina", selected.MaxStamina, 10f, 1000f);
             AddStat("Dreno", selected.StaminaDrain, 0f, 40f);
-
-            var grant = ValheimUi.CreateButton(_adminEditor, "Dar esta montaria a mim", 0f, 42f, 15);
-            grant.onClick.AddListener(() =>
-            {
-                MountRoster.Grant(Player.m_localPlayer, selected);
-                Select(selected);
-                Say($"{selected.Name} liberada para você.");
-                RebuildMine();
-            });
-            Track(grant.gameObject);
+            AddIntStat("Habilidade exigida (nível)", selected.RequiredRank, 1, Mathf.Max(1, RidingRanks.Count));
 
             var apply = ValheimUi.CreateButton(_adminEditor, "Aplicar stats", 0f, 42f, 15);
             apply.onClick.AddListener(() =>
@@ -400,22 +594,33 @@ namespace ValheimMontarias
                 selected.ApplyAll?.Invoke();
                 Say("Ajustes aplicados.");
             });
-            Track(apply.gameObject);
+
+            Heading("Minha ficha (no servidor)");
+            var grant = ValheimUi.CreateButton(_adminEditor, "Dar esta montaria a mim", 0f, 42f, 15);
+            grant.onClick.AddListener(() => AdminAction(RiderNet.ActionGrantMount, selected.Id));
+            var nextRank = ValheimUi.CreateButton(_adminEditor, "Aprender o próximo nível da habilidade", 0f, 42f, 15);
+            nextRank.onClick.AddListener(() => AdminAction(RiderNet.ActionNextRank, ""));
+            var reset = ValheimUi.CreateButton(_adminEditor, "Zerar minha habilidade e montarias", 0f, 42f, 15);
+            reset.onClick.AddListener(() => AdminAction(RiderNet.ActionReset, ""));
         }
 
-        private void AddStat(string label, BepInEx.Configuration.ConfigEntry<float> entry, float min, float max)
+        private void AdminAction(string action, string argument)
+        {
+            Say(RiderNet.Send(action, argument) ? "Pedido enviado ao servidor..." : "O pedido não chegou ao servidor.");
+        }
+
+        private void AddStat(string label, ConfigEntry<float> entry, float min, float max)
         {
             if (entry == null) return;
             Heading($"{label}: {entry.Value:0.0}");
-            var row = Row(40f);
-            var field = ValheimUi.CreateInputField(row, entry.Value.ToString("0.0", CultureInfo.InvariantCulture),
-                100f, 38f);
-            Flex(field.gameObject);
+            var row = Row(_adminEditor, 40f);
+            var field = ValheimUi.CreateInputField(row, entry.Value.ToString("0.0", CultureInfo.InvariantCulture), 100f, 38f);
+            Flexible(field.gameObject);
             var save = ValheimUi.CreateButton(row, "OK", 70f, 38f, 14);
             save.onClick.AddListener(() =>
             {
                 if (!float.TryParse(field.text.Replace(',', '.'), NumberStyles.Float,
-                    CultureInfo.InvariantCulture, out float value))
+                        CultureInfo.InvariantCulture, out float value))
                 {
                     Say("Valor inválido.");
                     return;
@@ -426,6 +631,27 @@ namespace ValheimMontarias
             });
         }
 
+        private void AddIntStat(string label, ConfigEntry<int> entry, int min, int max)
+        {
+            if (entry == null) return;
+            Heading($"{label}: {entry.Value}");
+            var row = Row(_adminEditor, 40f);
+            var field = ValheimUi.CreateInputField(row, entry.Value.ToString(CultureInfo.InvariantCulture), 100f, 38f);
+            Flexible(field.gameObject);
+            var save = ValheimUi.CreateButton(row, "OK", 70f, 38f, 14);
+            save.onClick.AddListener(() =>
+            {
+                if (!int.TryParse(field.text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int value))
+                {
+                    Say("Valor inválido.");
+                    return;
+                }
+                entry.Value = Mathf.Clamp(value, min, max);
+                field.text = entry.Value.ToString(CultureInfo.InvariantCulture);
+                Say($"{label} = {entry.Value}");
+            });
+        }
+
         private void Heading(string text)
         {
             var label = ValheimUi.CreateLabel(_adminEditor, text, 16, ValheimUi.Orange,
@@ -433,9 +659,14 @@ namespace ValheimMontarias
             ValheimUi.SetHeight(label.gameObject, 22f);
         }
 
-        private RectTransform Row(float height)
+        private static string UnlockLabel() =>
+            MountRoster.UnlockAll ? "Liberar todas: LIGADO" : "Liberar todas: DESLIGADO";
+
+        // ---- helpers ----
+
+        private static RectTransform Row(Transform parent, float height)
         {
-            var row = ValheimUi.CreateRect("Row", _adminEditor);
+            var row = ValheimUi.CreateRect("Row", parent);
             var layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.spacing = 8f;
             layout.childControlWidth = true;
@@ -447,46 +678,15 @@ namespace ValheimMontarias
             return row;
         }
 
-        private static void Flex(GameObject go)
+        private static void Flexible(GameObject go)
         {
             var element = go.GetComponent<LayoutElement>() ?? go.AddComponent<LayoutElement>();
             element.flexibleWidth = 1f;
         }
 
-        private static string UnlockLabel()
-        {
-            bool on = MountSettings.UnlockAll != null && MountSettings.UnlockAll.Value;
-            return on ? "Liberar todas: LIGADO" : "Liberar todas: DESLIGADO";
-        }
+        private static float Value(ConfigEntry<float> entry) => entry != null ? entry.Value : 0f;
 
-        private void CloseInternal()
-        {
-            if (!_open) return;
-            _open = false;
-            _tab = Tab.Mine;
-            _tabButtons.Clear();
-            ClearTracked();
-            _mineRoot = null;
-            _mineList = null;
-            _adminRoot = null;
-            _adminList = null;
-            _adminEditor = null;
-            _status = null;
-            _header = null;
-            if (_canvas != null) Destroy(_canvas);
-            _canvas = null;
-
-            if (InventoryGui.instance != null && InventoryGui.IsVisible()) return;
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
-        }
-
-        private void Track(GameObject go)
-        {
-            if (go != null) _spawned.Add(go);
-        }
-
-        private void ClearChildren(RectTransform content)
+        private static void ClearChildren(RectTransform content)
         {
             if (content == null) return;
             for (int i = content.childCount - 1; i >= 0; i--)
@@ -494,11 +694,6 @@ namespace ValheimMontarias
                 var child = content.GetChild(i);
                 if (child != null) Destroy(child.gameObject);
             }
-        }
-
-        private void ClearTracked()
-        {
-            _spawned.Clear();
         }
 
         private void Say(string text)
@@ -536,12 +731,11 @@ namespace ValheimMontarias
         private static string FindPng(string fileName)
         {
             string root = Path.Combine(Paths.PluginPath, "ValheimMontarias", "Assets");
-            var folders = new[] { "Menu", "menu", "" };
-            for (int i = 0; i < folders.Length; i++)
+            foreach (var folder in new[] { "Menu", "menu", "" })
             {
-                string path = string.IsNullOrEmpty(folders[i])
+                string path = string.IsNullOrEmpty(folder)
                     ? Path.Combine(root, fileName)
-                    : Path.Combine(root, folders[i], fileName);
+                    : Path.Combine(root, folder, fileName);
                 if (File.Exists(path)) return path;
             }
             return null;
@@ -563,11 +757,13 @@ namespace ValheimMontarias
             }
         }
 
+        private static string SummonKeyName() =>
+            MountSettings.SummonKey != null ? MountSettings.SummonKey.Value.MainKey.ToString() : "H";
+
         private static string HintText()
         {
             string menu = MountSettings.MenuKey != null ? MountSettings.MenuKey.Value.MainKey.ToString() : "U";
-            string summon = MountSettings.SummonKey != null ? MountSettings.SummonKey.Value.MainKey.ToString() : "H";
-            return $"{menu} fecha  ·  {summon} invoca  ·  Esc fecha";
+            return $"{menu} fecha  ·  {SummonKeyName()} invoca  ·  Esc fecha";
         }
 
         private static string Sanitize(string value, string fallback)

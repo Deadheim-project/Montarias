@@ -140,9 +140,10 @@ namespace ValheimMontarias
             var znet = ZNet.instance;
             if (znet == null) return false;
             var result = Call(znet, "LocalPlayerIsAdminOrHost");
-            if (result is bool admin) return admin;
+            if (result is bool admin && admin) return true;
             result = Call(znet, "PlayerIsAdmin");
-            return result is bool fallback && fallback;
+            if (result is bool fallback && fallback) return true;
+            return Plugin.LocalIsServerSyncAdmin;
         }
 
         public static Rigidbody Body(Character character)

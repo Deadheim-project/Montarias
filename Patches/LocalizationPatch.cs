@@ -51,6 +51,7 @@ namespace ValheimMontarias.Patches
             if (__instance != Player.m_localPlayer) return;
             if (Localization.instance != null)
                 Localization_SetupLanguage_Patch.Apply(Localization.instance);
+            RiderClient.Request(true);
         }
     }
 }

@@ -20,6 +20,17 @@ namespace ValheimMontarias.Prefabs
             BoarPrefab.FitSeat(go);
         }
 
+        /// <summary>Re-applies move speed to every mount of ours, after the local rider's skill
+        /// level (and with it the speed bonus) changed.</summary>
+        public static void ApplySpeedAll()
+        {
+            foreach (var character in Character.GetAllCharacters())
+            {
+                if (character != null && BoarPrefab.IsOurs(character.gameObject))
+                    BoarPrefab.ApplyMoveSpeed(character);
+            }
+        }
+
         public static void KeepHumanScale(Player player)
         {
             BoarPrefab.KeepHumanScale(player);

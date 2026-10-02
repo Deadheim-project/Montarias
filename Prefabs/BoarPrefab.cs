@@ -32,13 +32,27 @@ namespace ValheimMontarias.Prefabs
         public static void ApplyMoveSpeed(Character character)
         {
             if (character == null) return;
-            Access.Set(character, "m_speed", MountSettings.Walk);
-            Access.Set(character, "m_walkSpeed", MountSettings.Walk);
-            Access.Set(character, "m_runSpeed", MountSettings.Run);
+            float bonus = RiderBonus(character);
+            Access.Set(character, "m_speed", MountSettings.Walk * bonus);
+            Access.Set(character, "m_walkSpeed", MountSettings.Walk * bonus);
+            Access.Set(character, "m_runSpeed", MountSettings.Run * bonus);
             Access.Set(character, "m_acceleration", 12f);
             Access.Set(character, "m_jumpForce", MountSettings.Jump);
             Access.Set(character, "m_jumpForceForward", 1.2f);
             ApplyName(character);
+        }
+
+        /// <summary>The riding skill bonus of the local player, for a mount that is theirs. The
+        /// owner's client is the one that moves the mount, so that is the only place the bonus
+        /// has to exist; the prefab and everyone else's mounts stay at the configured speed.</summary>
+        private static float RiderBonus(Character character)
+        {
+            var go = character.gameObject;
+            if (Prefab == null || go == Prefab) return 1f;
+            var player = Player.m_localPlayer;
+            if (player == null) return 1f;
+            long owner = JavaliControl.OwnerId(go);
+            return owner != 0L && owner == player.GetPlayerID() ? MountRoster.SpeedBonus : 1f;
         }
 
         public static void ApplyName(Character character)

@@ -14,7 +14,7 @@ namespace ValheimMontarias
     {
         public const string Guid = "com.valheimmontarias.mod";
         public const string Name = "ValheimMontarias";
-        public const string Version = "0.2.0";
+        public const string Version = "0.3.0";
 
         internal static ManualLogSource Log;
         private Harmony _harmony;
@@ -26,6 +26,16 @@ namespace ValheimMontarias
             CurrentVersion = Version,
             MinimumRequiredVersion = Version
         };
+
+        /// <summary>
+        /// The admin bit ServerSync received from the server. On a dedicated server the vanilla
+        /// LocalPlayerIsAdminOrHost is not reliable on the client (NpcValheim found the same),
+        /// while the server already told ServerSync. Only decides what the menu shows: every
+        /// admin action is checked again on the server (RiderServer.IsAdmin).
+        /// </summary>
+        internal static bool LocalIsServerSyncAdmin =>
+            (ZNet.instance != null && ZNet.instance.IsServer()) ||
+            (ConfigSync.InitialSyncDone && ConfigSync.IsAdmin);
 
         private void Awake()
         {

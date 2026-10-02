@@ -25,6 +25,7 @@ namespace ValheimMontarias
         public ConfigEntry<float> MaxHealth;
         public ConfigEntry<float> MaxStamina;
         public ConfigEntry<float> StaminaDrain;
+        public ConfigEntry<int> RequiredRank;
 
         public MountProfile(string id, string defaultName, Func<GameObject, bool> isInstance, Action applyAll)
         {
@@ -44,6 +45,9 @@ namespace ValheimMontarias
                 return value.Trim();
             }
         }
+
+        /// <summary>Riding skill level needed to summon it (1 = the first level).</summary>
+        public int MinRank => RequiredRank != null ? Mathf.Max(1, RequiredRank.Value) : 1;
     }
 
     internal static class MountSettings
@@ -64,6 +68,7 @@ namespace ValheimMontarias
         public static ConfigEntry<KeyboardShortcut> MenuKey;
         public static ConfigEntry<KeyboardShortcut> SummonKey;
         public static ConfigEntry<string> SelectedMount;
+        public static ConfigEntry<string> RidingRankList;
 
         public static float Run => Javali != null ? Javali.RunSpeed.Value : 12f;
         public static float Walk => Javali != null ? Javali.WalkSpeed.Value : 5.5f;
@@ -90,7 +95,13 @@ namespace ValheimMontarias
             sync.AddLockingConfigEntry(LockConfig);
 
             UnlockAll = Bind(plugin, sync, "Geral", "LiberarTodasGratis", false,
-                "Se ligado, todas as montarias ficam disponíveis para todos, sem precisar liberar.");
+                "Se ligado, todo mundo tem a habilidade máxima e todas as montarias, sem comprar.");
+
+            RidingRankList = Bind(plugin, sync, "Habilidade", "Niveis", RidingRanks.Default,
+                "Níveis da Habilidade de Montaria, em ordem: nome:velocidade separados por |. " +
+                "A velocidade multiplica a da montaria de quem tem o nível (1 = sem bônus). " +
+                "Quem vende é o Mestre das Montarias (NpcValheim).");
+            RidingRankList.SettingChanged += (_, __) => MountHub.ApplySpeedAll();
 
             MenuKey = plugin.Config.Bind("Geral", "TeclaMenu", new KeyboardShortcut(KeyCode.U),
                 "Abre o menu de montarias.");
@@ -104,6 +115,17 @@ namespace ValheimMontarias
                 MenuKey.Value = new KeyboardShortcut(KeyCode.U);
                 SummonKey.Value = new KeyboardShortcut(KeyCode.H);
             }
+        }
+
+        public static MountProfile ById(string id)
+        {
+            if (string.IsNullOrEmpty(id) || All == null) return null;
+            for (int i = 0; i < All.Length; i++)
+            {
+                if (All[i] != null && All[i].Id == id)
+                    return All[i];
+            }
+            return null;
         }
 
         public static MountProfile Find(GameObject go)
@@ -133,6 +155,8 @@ namespace ValheimMontarias
             profile.MaxHealth = Bind(plugin, sync, group, "Vida", health, "Vida máxima da montaria.");
             profile.MaxStamina = Bind(plugin, sync, group, "Stamina", stamina, "Stamina máxima da montaria.");
             profile.StaminaDrain = Bind(plugin, sync, group, "DrenoStamina", drain, "Stamina gasta por segundo ao correr.");
+            profile.RequiredRank = Bind(plugin, sync, group, "HabilidadeMinima", 1,
+                "Nível da Habilidade de Montaria exigido para invocar (1 = o primeiro nível).");
 
             profile.CustomName.SettingChanged += (_, __) => profile.ApplyAll();
             profile.RunSpeed.SettingChanged += (_, __) => profile.ApplyAll();

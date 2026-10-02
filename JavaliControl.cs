@@ -164,24 +164,10 @@ namespace ValheimMontarias.Prefabs
         internal static void TrySummonProfile(Player player, MountProfile profile)
         {
             if (player == null) return;
-            if (profile == null)
-            {
-                player.Message(MessageHud.MessageType.Center, "Você ainda não possui nenhuma montaria.");
-                return;
-            }
-            if (!MountRoster.Owns(player, profile))
-            {
-                player.Message(MessageHud.MessageType.Center, "Você ainda não tem essa montaria.");
-                return;
-            }
             if (CombatLock.Block(player)) return;
             if (Time.frameCount == _summonFrame) return;
             _summonFrame = Time.frameCount;
             Access.Set(player, "m_useItem", null);
-
-            string prefabName = string.IsNullOrEmpty(profile.PrefabName) ? BoarPrefab.PrefabName : profile.PrefabName;
-            System.Func<GameObject, bool> isOurs = profile.IsInstance;
-            float cast = profile.CastSeconds != null ? Mathf.Max(0.1f, profile.CastSeconds.Value) : 2f;
 
             if (_casting)
             {
@@ -189,6 +175,9 @@ namespace ValheimMontarias.Prefabs
                 return;
             }
 
+            // Recalling is always allowed: a mount that is out stays yours to put away even
+            // if the skill or the mount itself was taken from you in the meantime.
+            System.Func<GameObject, bool> isOurs = profile != null ? profile.IsInstance : MountHub.IsOurs;
             var existing = FindOwned(player, isOurs);
             if (existing != null)
             {
@@ -200,10 +189,19 @@ namespace ValheimMontarias.Prefabs
                 return;
             }
 
+            string blocker = MountRoster.Blocker(profile);
+            if (blocker != null)
+            {
+                if (!MountRoster.Known) RiderClient.Request(true);
+                player.Message(MessageHud.MessageType.Center, blocker);
+                return;
+            }
+
             if (_pendingDespawn != null)
                 return;
 
-            _castPrefab = prefabName;
+            _castPrefab = string.IsNullOrEmpty(profile.PrefabName) ? BoarPrefab.PrefabName : profile.PrefabName;
+            float cast = profile.CastSeconds != null ? Mathf.Max(0.1f, profile.CastSeconds.Value) : 2f;
             _casting = true;
             _castStartedAt = Time.unscaledTime;
             _castUntil = Time.unscaledTime + cast;
