@@ -7,7 +7,7 @@ namespace ValheimMontarias.Prefabs
         public const string PrefabName = "ApitoJavali";
         public const string DisplayName = "Apito da Capivara";
         public const string DisplayDesc =
-            "U abre o menu, H invoca ou recolhe. Admin: aba Admin ou E na montaria.";
+            "Use para montar na Capivara; use de novo (ou E) para descer. Requer a Habilidade de Montaria.";
 
         internal static GameObject ItemPrefab { get; private set; }
 
@@ -37,7 +37,54 @@ namespace ValheimMontarias.Prefabs
 
         public static bool IsWhistle(ItemDrop.ItemData item)
         {
-            return IsCapybara(item);
+            return ProfileOf(item) != null;
+        }
+
+        /// <summary>The mount an item stands for, or null when it is not a mount item.</summary>
+        public static MountProfile ProfileOf(ItemDrop.ItemData item)
+        {
+            if (item?.m_shared == null) return null;
+            var byPrefab = item.m_dropPrefab != null ? MountSettings.ByItem(item.m_dropPrefab.name) : null;
+            if (byPrefab != null) return byPrefab;
+            return IsCapybara(item) ? MountSettings.Javali : null;
+        }
+
+        public static bool Has(Player player, MountProfile profile)
+        {
+            var items = player?.GetInventory()?.GetAllItems();
+            if (items == null || profile == null) return false;
+            foreach (var item in items)
+                if (ProfileOf(item) == profile) return true;
+            return false;
+        }
+
+        /// <summary>Puts the mount item in the player's bag, or at their feet when the bag is
+        /// full. The item is only a way to use the mount: it does nothing for anyone who does
+        /// not own that mount on the server, so a copy is worth nothing to somebody else.</summary>
+        public static bool GiveTo(Player player, MountProfile profile)
+        {
+            if (player == null || profile == null) return false;
+            var prefab = ObjectDB.instance != null ? ObjectDB.instance.GetItemPrefab(profile.ItemPrefab) : null;
+            var drop = prefab != null ? prefab.GetComponent<ItemDrop>() : null;
+            if (drop?.m_itemData == null)
+            {
+                Plugin.Log.LogWarning($"ValheimMontarias: mount item {profile.ItemPrefab} not registered");
+                return false;
+            }
+
+            var data = drop.m_itemData.Clone();
+            data.m_stack = 1;
+            data.m_dropPrefab = prefab;
+            var inventory = player.GetInventory();
+            if (inventory != null && inventory.AddItem(data))
+            {
+                player.Message(MessageHud.MessageType.TopLeft, $"Recebido: {data.m_shared.m_name}", 1, null);
+                return true;
+            }
+
+            ItemDrop.DropItem(data, 1, player.transform.position + Vector3.up, Quaternion.identity);
+            player.Message(MessageHud.MessageType.Center, $"Inventário cheio: {data.m_shared.m_name} caiu no chão");
+            return true;
         }
 
         private static bool CanBeWhistle(ItemDrop.ItemData item)

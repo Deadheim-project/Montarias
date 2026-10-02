@@ -4,6 +4,9 @@ using ValheimMontarias.Prefabs;
 
 namespace ValheimMontarias.Patches
 {
+    // Using the mount item -- from the hotbar or the inventory -- mounts, and using it again
+    // dismounts. Every way the game has of "using" an item lands in JavaliControl.UseMountItem,
+    // which ignores a second call in the same frame.
     [HarmonyPatch(typeof(Player), "UseHotbarItem")]
     internal static class Player_UseHotbarItem_Patch
     {
@@ -15,7 +18,7 @@ namespace ValheimMontarias.Patches
             if (__instance != Player.m_localPlayer) return true;
             var item = FindHotbarItem(__instance, index);
             if (!WhistleItem.IsWhistle(item)) return true;
-            __instance.Message(MessageHud.MessageType.Center, "Use U para abrir o menu de montarias. H invoca.");
+            JavaliControl.UseMountItem(__instance, item);
             return false;
         }
 
@@ -41,7 +44,7 @@ namespace ValheimMontarias.Patches
         {
             if (!(__instance is Player player) || player != Player.m_localPlayer) return true;
             if (!WhistleItem.IsWhistle(item)) return true;
-            player.Message(MessageHud.MessageType.Center, "Use U para abrir o menu de montarias. H invoca.");
+            JavaliControl.UseMountItem(player, item);
             return false;
         }
     }
@@ -56,7 +59,7 @@ namespace ValheimMontarias.Patches
         {
             if (__instance != Player.m_localPlayer) return true;
             if (!WhistleItem.IsWhistle(item)) return true;
-            __instance.Message(MessageHud.MessageType.Center, "Use U para abrir o menu de montarias. H invoca.");
+            JavaliControl.UseMountItem(__instance, item);
             return false;
         }
     }
@@ -71,7 +74,7 @@ namespace ValheimMontarias.Patches
         {
             if (__instance != Player.m_localPlayer) return true;
             if (!WhistleItem.IsWhistle(item)) return true;
-            __instance.Message(MessageHud.MessageType.Center, "Use U para abrir o menu de montarias. H invoca.");
+            JavaliControl.UseMountItem(__instance, item);
             __result = true;
             return false;
         }

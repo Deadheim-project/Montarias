@@ -213,6 +213,11 @@ namespace ValheimMontarias
 
         internal static void Apply(int rank, string mounts)
         {
+            // The first answer after logging in is the baseline. After that, a mount that
+            // appears in the list was just bought or granted, and its item goes in the bag.
+            bool baseline = !Known;
+            var before = new HashSet<string>(OwnedMounts, StringComparer.Ordinal);
+
             Known = true;
             Rank = Mathf.Max(0, rank);
             OwnedMounts.Clear();
@@ -220,6 +225,16 @@ namespace ValheimMontarias
                 if (id.Trim().Length > 0) OwnedMounts.Add(id.Trim());
             Revision++;
             Prefabs.MountHub.ApplySpeedAll();
+
+            if (baseline) return;
+            var player = Player.m_localPlayer;
+            foreach (var id in OwnedMounts)
+            {
+                if (before.Contains(id)) continue;
+                var profile = MountSettings.ById(id);
+                if (profile != null && !Prefabs.WhistleItem.Has(player, profile))
+                    Prefabs.WhistleItem.GiveTo(player, profile);
+            }
         }
 
         internal static void Tell(string message)

@@ -3,53 +3,56 @@ using UnityEngine;
 namespace ValheimMontarias.Prefabs
 {
     /// <summary>
-    /// Lives on every mount. A mount works like in WoW: the cast ends with the rider already
-    /// in the saddle, and a mount nobody is riding does not exist -- it is dismissed as soon as
-    /// it is left empty (dismount, the rider dying on it, an old mount from before this rule).
-    /// It is not persistent either, so it leaves with its rider when they log out.
+    /// Lives on every mount. A mount works like in WoW: you use the mount item (or H, or the
+    /// menu), the cast ends and you are on it; you get off and it is gone. There is never an
+    /// empty mount: it is created hidden, shown only once the rider is in the saddle, and
+    /// destroyed the moment it has nobody on it. It is not persistent either, so it leaves
+    /// with its rider when they log out.
     /// </summary>
     public class JavaliControl : MonoBehaviour
     {
         public const string OwnerKey = "javali_owner";
 
-        /// <summary>How long a mount may stand empty before it is dismissed. Covers the frames
-        /// between the spawn and the rider being attached.</summary>
-        private const float EmptyGrace = 3f;
-
-        private float _emptySince = -1f;
-        private float _bornAt;
-
         protected virtual void Start()
         {
-            _bornAt = Time.time;
             InitPet();
             BoarPrefab.ApplyAll(gameObject);
         }
 
-        /// <summary>Only the process that owns the mount's ZDO dismisses it: the rider while
-        /// riding, the summoner before that.</summary>
+        /// <summary>The process that owns the mount's ZDO (the rider) removes it the frame it
+        /// is left empty: dismount, the rider dying on it, a leftover from an older version.</summary>
         private void Update()
         {
-            var nview = GetComponent<ZNetView>();
-            if (nview == null || !nview.IsValid() || !nview.IsOwner()) return;
-            if (_pendingMount == gameObject || IsRidden())
+            if (_pendingMount == gameObject)
             {
-                _emptySince = -1f;
+                // Start can rebuild the visuals before the rider is on; keep them hidden.
+                Hide(gameObject);
                 return;
             }
 
-            if (_emptySince < 0f) _emptySince = Time.time;
-            if (Time.time - _emptySince < 1f || Time.time - _bornAt < EmptyGrace) return;
-            _emptySince = -1f;
+            var nview = GetComponent<ZNetView>();
+            if (nview == null || !nview.IsValid() || !nview.IsOwner()) return;
+            if (IsRidden()) return;
+            gameObject.SetActive(false);
             Despawn(gameObject);
         }
 
+        /// <summary>Several ways of asking, because getting this wrong deletes a mount from under
+        /// its rider: the local player's saddle controller or attach point belonging to this
+        /// mount, the player parented to it, or the saddle's own record of a rider.</summary>
         private bool IsRidden()
         {
-            var sadle = GetComponentInChildren<Sadle>(true);
-            if (Access.HaveRider(sadle)) return true;
             var local = Player.m_localPlayer;
-            return local != null && local.transform.IsChildOf(transform);
+            if (local != null)
+            {
+                if (local.transform.IsChildOf(transform)) return true;
+                if (Access.GetDoodad(local) is Component controller && controller != null &&
+                    controller.transform.IsChildOf(transform)) return true;
+                if (Access.Get(local, "m_attached") is bool attached && attached &&
+                    Access.Get(local, "m_attachPoint") is Transform point && point != null &&
+                    point.IsChildOf(transform)) return true;
+            }
+            return Access.HaveRider(GetComponentInChildren<Sadle>(true));
         }
 
         protected void InitPet()
@@ -192,6 +195,13 @@ namespace ValheimMontarias.Prefabs
                 ForceUnseat(player);
         }
 
+        /// <summary>The mount item was used: mount if on foot, dismount if riding.</summary>
+        public static void UseMountItem(Player player, ItemDrop.ItemData item)
+        {
+            if (player == null || player != Player.m_localPlayer) return;
+            TrySummonProfile(player, WhistleItem.ProfileOf(item) ?? MountSettings.Javali);
+        }
+
         public static void TrySummon(Player player)
         {
             TrySummonProfile(player, MountSettings.Javali);
@@ -200,7 +210,6 @@ namespace ValheimMontarias.Prefabs
         internal static void TrySummonProfile(Player player, MountProfile profile)
         {
             if (player == null) return;
-            if (CombatLock.Block(player)) return;
             if (Time.frameCount == _summonFrame) return;
             _summonFrame = Time.frameCount;
             Access.Set(player, "m_useItem", null);
@@ -211,18 +220,16 @@ namespace ValheimMontarias.Prefabs
                 return;
             }
 
-            // Recalling is always allowed: a mount that is out stays yours to put away even
-            // if the skill or the mount itself was taken from you in the meantime.
-            System.Func<GameObject, bool> isOurs = profile != null ? profile.IsInstance : MountHub.IsOurs;
-            var existing = FindOwned(player, isOurs);
-            if (existing != null)
+            // Riding already: the same key or item gets you off, and the mount is gone.
+            // Always allowed -- in combat too, and even if the skill or the mount was taken
+            // away meanwhile.
+            if (IsRiding(player) || FindOwned(player, MountHub.IsOurs) != null)
             {
-                _pendingMount = null;
-                ForceUnseat(player);
-                existing.SetActive(false);
-                QueueDespawn(existing);
+                Dismount(player);
                 return;
             }
+
+            if (CombatLock.Block(player)) return;
 
             string blocker = MountRoster.Blocker(profile);
             if (blocker != null)
@@ -292,8 +299,9 @@ namespace ValheimMontarias.Prefabs
                 return;
             }
 
-            // Right under the rider, facing where they face, and mounted in this same frame:
-            // the cast ends with the player in the saddle, not with a mount standing beside them.
+            // Right under the rider, facing where they face. It is born hidden and does not
+            // touch the rider, and only shows once they are in the saddle -- normally this same
+            // frame. Nobody ever sees it standing empty.
             var rot = Quaternion.LookRotation(Flat(player.transform.forward));
             var go = UnityEngine.Object.Instantiate(prefab, player.transform.position, rot);
             SetOwner(go, player);
@@ -301,7 +309,12 @@ namespace ValheimMontarias.Prefabs
             Access.Call(tame, "Tame");
             Access.SetSaddle(tame, true);
             MountHub.ApplyAll(go);
-            QueueAutoMount(go, player);
+            IgnoreRider(go, player);
+            Hide(go);
+
+            _pendingMount = go;
+            _pendingMountPlayer = player;
+            _pendingMountUntil = Time.unscaledTime + 0.5f;
             TryFinishAutoMount();
         }
 
@@ -311,16 +324,8 @@ namespace ValheimMontarias.Prefabs
             return forward.sqrMagnitude > 0.0001f ? forward.normalized : Vector3.forward;
         }
 
-        private static void QueueAutoMount(GameObject go, Player player)
-        {
-            _pendingMount = go;
-            _pendingMountPlayer = player;
-            _pendingMountUntil = Time.unscaledTime + 1.5f;
-        }
-
-        /// <summary>Keeps asking the saddle for control until the rider is on (normally the same
-        /// frame: the summoner owns the new mount, so the request is answered locally). A mount
-        /// that cannot be ridden is dismissed rather than left standing there.</summary>
+        /// <summary>Puts the rider in the saddle. If they are not on it by the end of the short
+        /// window, the mount -- still hidden -- is destroyed and they are told why.</summary>
         private static void TryFinishAutoMount()
         {
             if (_pendingMount == null) return;
@@ -331,31 +336,110 @@ namespace ValheimMontarias.Prefabs
                 ClearPendingMount();
                 return;
             }
-            if (player != null && IsRiding(player))
+
+            if (player != null && !player.IsDead() && !CombatLock.IsInCombat(player))
             {
-                ClearPendingMount();
-                return;
+                if (!IsRiding(player)) AttachNow(go, player);
+                if (IsRiding(player))
+                {
+                    ClearPendingMount();
+                    Show();
+                    return;
+                }
+                if (Time.unscaledTime <= _pendingMountUntil)
+                {
+                    Hide(go);
+                    return;
+                }
             }
 
-            string failure = null;
-            if (player == null || player.IsDead()) failure = "";
-            else if (CombatLock.IsInCombat(player)) failure = CombatLock.Message;
-            else if (Time.unscaledTime > _pendingMountUntil) failure = "Não foi possível montar aqui.";
-            if (failure != null)
-            {
-                ClearPendingMount();
-                Despawn(go);
-                if (failure.Length > 0) player.Message(MessageHud.MessageType.Center, failure);
-                return;
-            }
+            ClearPendingMount();
+            _hidden.Clear();
+            go.SetActive(false);
+            Despawn(go);
+            if (player != null && !player.IsDead())
+                player.Message(MessageHud.MessageType.Center,
+                    CombatLock.IsInCombat(player) ? CombatLock.Message : "Não foi possível montar aqui.");
+        }
 
-            TryMount(go, player);
+        /// <summary>
+        /// Asks the saddle for control straight away. The summoner owns the new mount, so the
+        /// saddle's own request handler can be run here and its answer comes back locally, in
+        /// this same frame -- without going through Sadle.Interact's walk-up checks, which are
+        /// about reaching a mount, not about one born under you. Interact stays as the fallback.
+        /// </summary>
+        private static void AttachNow(GameObject go, Player player)
+        {
+            var sadle = go.GetComponentInChildren<Sadle>(true);
+            if (sadle == null) return;
+            try
+            {
+                if (ZRoutedRpc.instance != null && Access.Get(ZRoutedRpc.instance, "m_id") is long self)
+                    Access.Call(sadle, "RPC_RequestControl", self, player.GetZDOID());
+                if (!IsRiding(player))
+                    TryMount(go, player);
+            }
+            catch (System.Exception e)
+            {
+                Plugin.Log.LogWarning($"ValheimMontarias: could not seat the rider: {e.Message}");
+            }
         }
 
         private static void ClearPendingMount()
         {
             _pendingMount = null;
             _pendingMountPlayer = null;
+        }
+
+        private static readonly System.Collections.Generic.List<Renderer> _hidden =
+            new System.Collections.Generic.List<Renderer>();
+
+        /// <summary>Turns off every renderer of the mount that is on, remembering which, so that
+        /// <see cref="Show"/> brings back exactly those (the vanilla boar meshes the capybara
+        /// skin replaces stay off). Safe to call again after the visuals were rebuilt.</summary>
+        private static void Hide(GameObject go)
+        {
+            foreach (var renderer in go.GetComponentsInChildren<Renderer>(true))
+            {
+                if (renderer == null || !renderer.enabled) continue;
+                renderer.enabled = false;
+                _hidden.Add(renderer);
+            }
+        }
+
+        private static void Show()
+        {
+            foreach (var renderer in _hidden)
+                if (renderer != null) renderer.enabled = true;
+            _hidden.Clear();
+        }
+
+        /// <summary>The mount is born on top of the rider; without this the two capsules would
+        /// shove each other apart before the rider is seated.</summary>
+        private static void IgnoreRider(GameObject go, Player player)
+        {
+            var riderCollider = Access.Get(player, "m_collider") as Collider;
+            if (riderCollider == null) return;
+            foreach (var collider in go.GetComponentsInChildren<Collider>(true))
+                if (collider != null) Physics.IgnoreCollision(riderCollider, collider, true);
+        }
+
+        /// <summary>Gets the player off their mount, and the mount is gone with it.</summary>
+        public static void Dismount(Player player)
+        {
+            if (player == null) return;
+            GameObject mount = null;
+            if (TryGetRidden(player, out var ridden, out _, out _) && ridden != null)
+                mount = ridden.gameObject;
+            if (mount == null)
+                mount = FindOwned(player, MountHub.IsOurs);
+
+            ClearPendingMount();
+            _hidden.Clear();
+            ForceUnseat(player);
+            if (mount == null) return;
+            mount.SetActive(false);
+            QueueDespawn(mount);
         }
 
         private static void QueueDespawn(GameObject go)
@@ -484,10 +568,7 @@ namespace ValheimMontarias.Prefabs
         private static float _rideLockUntil;
         internal static bool AllowUnseat;
 
-        public static void RequestDismount(Player player)
-        {
-            ForceUnseat(player);
-        }
+        public static void RequestDismount(Player player) => Dismount(player);
 
         public static void ForceUnseat(Player player)
         {
@@ -592,6 +673,13 @@ namespace ValheimMontarias.Prefabs
             if (AdminMenu.IsOpen)
             {
                 Access.ApplyDoodad(controller, player);
+                return true;
+            }
+
+            // E (Use) gets you off, like the mount item and H do. The mount goes with it.
+            if (Access.DismountPressed())
+            {
+                Dismount(player);
                 return true;
             }
 
@@ -717,7 +805,7 @@ namespace ValheimMontarias.Prefabs
                 return "Em combate: não é possível usar a montaria";
             if (Access.IsAdmin())
                 return "[<color=yellow><b>E</b></color>] Ajustes da montaria (admin)\nU abre o menu  ·  H monta/desmonta";
-            return "H desmonta.\nMontado: Espaço salta, clique investida";
+            return "E, H ou o item da montaria desmontam.\nMontado: Espaço salta, clique investida";
         }
     }
 }

@@ -396,10 +396,25 @@ namespace ValheimMontarias
                 $"Velocidade: {Value(profile.RunSpeed) * bonus:0.#}" +
                 (bonus > 1.001f ? $" <color=#9a9188>(+{(bonus - 1f) * 100f:0}% da sua habilidade)</color>" : "") + "\n" +
                 $"Vida: {Value(profile.MaxHealth):0}   Stamina: {Value(profile.MaxStamina):0}\n" +
-                "Montado: Espaço salta, clique dá uma investida.",
+                "Use o item da montaria (ou H) para montar; E, H ou o item para descer.",
                 15, ValheimUi.Beige, TextAlignmentOptions.TopLeft);
             ValheimUi.Anchor((RectTransform)stats.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(192f, -200f), new Vector2(-16f, -92f));
+
+            // The mount item is how you mount from the hotbar; whoever owns the mount can take
+            // another one here if theirs was lost. It does nothing for anyone who does not own it.
+            if (MountRoster.Owns(profile) && !WhistleItem.Has(Player.m_localPlayer, profile))
+            {
+                var take = ValheimUi.CreateButton(_journalDetail, "Pegar o item", 150f, 40f, 16);
+                ValheimUi.Anchor((RectTransform)take.transform, new Vector2(0f, 0f), new Vector2(0f, 0f),
+                    new Vector2(16f, 16f), new Vector2(166f, 56f));
+                take.onClick.AddListener(() =>
+                {
+                    if (WhistleItem.GiveTo(Player.m_localPlayer, profile))
+                        Say("Item da montaria no inventário: use-o para montar.");
+                    RebuildJournal();
+                });
+            }
 
             string blocker = MountRoster.Blocker(profile);
             if (blocker != null)

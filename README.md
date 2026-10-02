@@ -21,19 +21,25 @@ Os níveis ficam em `[Habilidade] Niveis` (`nome:velocidade|...`). O padrão é
 
 ## Como usar
 
+Como no WoW, **não existe montaria vazia**:
+
+- **Use o item da montaria** (o *Apito da Capivara*, na hotbar ou no inventário): termina a
+  conjuração (cancelada por movimento, ataque ou pulo) e você **aparece montado**.
+- **Saiu, sumiu:** usar o item de novo, **E** ou **H** tiram você da montaria, e ela some na
+  hora. Se o cavaleiro morre montado, ela some também. Se não der para montar ali, ela nem
+  chega a aparecer. Ela não fica salva no mundo e sai junto com o jogador no logout.
+- O item vem para a bolsa quando você ganha a montaria (compra no Mestre das Montarias ou
+  admin). Perdeu? No menu, **Pegar o item**. Ele só funciona para quem possui a montaria no
+  servidor: uma cópia não serve para mais ninguém.
+- **H** faz o mesmo que o item, para a montaria escolhida no menu.
 - **U** abre o menu de montarias, de qualquer lugar, na mesma janela dos NPCs:
-  - *Montarias*: todas as montarias, o que falta para cada uma, **Montar** e **Usar no H**;
+  - *Montarias*: todas as montarias, o que falta para cada uma, **Montar**, **Usar no H** e
+    **Pegar o item**;
   - *Habilidade*: o seu nível e os próximos;
   - *Admin* (só admin): stats de cada montaria e a sua própria ficha no servidor.
-- **H** monta na montaria escolhida, como no WoW: termina a conjuração (cancelada por
-  movimento, ataque ou pulo) e você **já está montado**; ela não aparece do lado. **H** de
-  novo desmonta, e a montaria some. Desmontar sempre funciona.
-- Montaria só existe com alguém em cima: se ficar vazia (o cavaleiro morreu montado, não deu
-  para montar ali) ela some sozinha, e ela não fica salva no mundo; sai junto com o jogador
-  quando ele desloga.
 - Montado: **Espaço** salta, **clique** dá uma investida.
 - Console: `javali` abre o menu.
-- Em combate (buff `DH_Combat` do Deadheim) não dá para invocar nem montar.
+- Em combate (buff `DH_Combat` do Deadheim) não dá para montar; descer sempre dá.
 
 ## Posse (no servidor)
 

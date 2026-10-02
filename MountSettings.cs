@@ -15,6 +15,8 @@ namespace ValheimMontarias
         public readonly Action ApplyAll;
         public string IconFile;
         public string PrefabName;
+        /// <summary>The mount item (its whistle): using it mounts and dismounts.</summary>
+        public string ItemPrefab;
 
         public ConfigEntry<string> CustomName;
         public ConfigEntry<float> RunSpeed;
@@ -84,7 +86,8 @@ namespace ValheimMontarias
             Javali = new MountProfile("javali", BoarPrefab.DisplayName, BoarPrefab.IsOurs, BoarPrefab.ApplyToAll)
             {
                 IconFile = "apito_capivara.png",
-                PrefabName = BoarPrefab.PrefabName
+                PrefabName = BoarPrefab.PrefabName,
+                ItemPrefab = WhistleItem.PrefabName
             };
             BindProfile(plugin, sync, Javali, "Montaria", 12f, 5.5f, 8.5f, 1f, 2f, 100f, 250f, 8f);
 
@@ -115,6 +118,17 @@ namespace ValheimMontarias
                 MenuKey.Value = new KeyboardShortcut(KeyCode.U);
                 SummonKey.Value = new KeyboardShortcut(KeyCode.H);
             }
+        }
+
+        public static MountProfile ByItem(string itemPrefab)
+        {
+            if (string.IsNullOrEmpty(itemPrefab) || All == null) return null;
+            for (int i = 0; i < All.Length; i++)
+            {
+                if (All[i] != null && All[i].ItemPrefab == itemPrefab)
+                    return All[i];
+            }
+            return null;
         }
 
         public static MountProfile ById(string id)

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
+using ValheimMontarias.Prefabs;
 
 namespace ValheimMontarias.Patches
 {
@@ -17,8 +18,7 @@ namespace ValheimMontarias.Patches
         {
             if (loc == null) return;
             Add(loc, "item_apitojavali", "Apito da Capivara");
-            Add(loc, "item_apitojavali_desc",
-                "U abre o menu, H invoca ou recolhe. Admin: aba Admin ou E na montaria.");
+            Add(loc, "item_apitojavali_desc", WhistleItem.DisplayDesc);
         }
 
         private static void Add(Localization loc, string key, string value)
