@@ -21,14 +21,17 @@ Os níveis ficam em `[Habilidade] Niveis` (`nome:velocidade|...`). O padrão é
 
 ## Como usar
 
-- **U** abre o menu de montarias, na mesma janela dos NPCs:
-  - *Montarias*: todas as montarias, o que falta para cada uma, **Invocar** e **Usar no H**;
+- **U** abre o menu de montarias, de qualquer lugar, na mesma janela dos NPCs:
+  - *Montarias*: todas as montarias, o que falta para cada uma, **Montar** e **Usar no H**;
   - *Habilidade*: o seu nível e os próximos;
   - *Admin* (só admin): stats de cada montaria e a sua própria ficha no servidor.
-- **H** invoca ou recolhe a montaria escolhida (com tempo de conjuração, cancelado por
-  movimento, ataque ou pulo). Recolher sempre funciona.
+- **H** monta na montaria escolhida, como no WoW: termina a conjuração (cancelada por
+  movimento, ataque ou pulo) e você **já está montado**; ela não aparece do lado. **H** de
+  novo desmonta, e a montaria some. Desmontar sempre funciona.
+- Montaria só existe com alguém em cima: se ficar vazia (o cavaleiro morreu montado, não deu
+  para montar ali) ela some sozinha, e ela não fica salva no mundo; sai junto com o jogador
+  quando ele desloga.
 - Montado: **Espaço** salta, **clique** dá uma investida.
-- **E** na montaria: admin abre os ajustes; **Shift+E** alterna seguir/ficar.
 - Console: `javali` abre o menu.
 - Em combate (buff `DH_Combat` do Deadheim) não dá para invocar nem montar.
 

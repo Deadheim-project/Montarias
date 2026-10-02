@@ -106,7 +106,7 @@ namespace ValheimMontarias
             MenuKey = plugin.Config.Bind("Geral", "TeclaMenu", new KeyboardShortcut(KeyCode.U),
                 "Abre o menu de montarias.");
             SummonKey = plugin.Config.Bind("Geral", "TeclaInvocar", new KeyboardShortcut(KeyCode.H),
-                "Invoca ou recolhe a montaria selecionada.");
+                "Monta na montaria escolhida (já sai montado, como no WoW) ou desmonta.");
             SelectedMount = plugin.Config.Bind("Geral", "MontariaSelecionada", "javali",
                 "Id da última montaria escolhida no menu.");
 

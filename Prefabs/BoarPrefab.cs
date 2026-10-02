@@ -243,9 +243,10 @@ namespace ValheimMontarias.Prefabs
             var clone = UnityEngine.Object.Instantiate(boar, Hidden);
             clone.name = PrefabName;
 
+            // A summon, not a pet: not saved with the world, and gone with its rider on logout.
             var nview = clone.GetComponent<ZNetView>();
             if (nview != null)
-                nview.m_persistent = true;
+                nview.m_persistent = false;
 
             var tame = clone.GetComponent<Tameable>();
             if (tame != null)

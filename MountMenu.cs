@@ -410,7 +410,7 @@ namespace ValheimMontarias
                 return;
             }
 
-            var summon = ValheimUi.CreateButton(_journalDetail, IsSummoned(profile) ? "Recolher" : "Invocar", 150f, 40f, 16);
+            var summon = ValheimUi.CreateButton(_journalDetail, IsSummoned(profile) ? "Desmontar" : "Montar", 150f, 40f, 16);
             ValheimUi.Anchor((RectTransform)summon.transform, new Vector2(1f, 0f), new Vector2(1f, 0f),
                 new Vector2(-166f, 16f), new Vector2(-16f, 56f));
             summon.onClick.AddListener(() =>
@@ -428,7 +428,7 @@ namespace ValheimMontarias
             choose.onClick.AddListener(() =>
             {
                 Select(profile);
-                Say($"{SummonKeyName()} agora invoca {profile.Name}.");
+                Say($"{SummonKeyName()} agora monta na {profile.Name}.");
             });
         }
 
@@ -763,7 +763,7 @@ namespace ValheimMontarias
         private static string HintText()
         {
             string menu = MountSettings.MenuKey != null ? MountSettings.MenuKey.Value.MainKey.ToString() : "U";
-            return $"{menu} fecha  ·  {SummonKeyName()} invoca  ·  Esc fecha";
+            return $"{menu} fecha  ·  {SummonKeyName()} monta/desmonta  ·  Esc fecha";
         }
 
         private static string Sanitize(string value, string fallback)

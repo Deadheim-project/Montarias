@@ -3,17 +3,53 @@ using UnityEngine;
 namespace ValheimMontarias.Prefabs
 {
     /// <summary>
-    /// Lives on the cloned boar. Makes sure it is tamed and saddled after spawn / world load.
-    /// Follow / stay / mount are handled by Tameable patches + whistle summon.
+    /// Lives on every mount. A mount works like in WoW: the cast ends with the rider already
+    /// in the saddle, and a mount nobody is riding does not exist -- it is dismissed as soon as
+    /// it is left empty (dismount, the rider dying on it, an old mount from before this rule).
+    /// It is not persistent either, so it leaves with its rider when they log out.
     /// </summary>
     public class JavaliControl : MonoBehaviour
     {
         public const string OwnerKey = "javali_owner";
 
+        /// <summary>How long a mount may stand empty before it is dismissed. Covers the frames
+        /// between the spawn and the rider being attached.</summary>
+        private const float EmptyGrace = 3f;
+
+        private float _emptySince = -1f;
+        private float _bornAt;
+
         protected virtual void Start()
         {
+            _bornAt = Time.time;
             InitPet();
             BoarPrefab.ApplyAll(gameObject);
+        }
+
+        /// <summary>Only the process that owns the mount's ZDO dismisses it: the rider while
+        /// riding, the summoner before that.</summary>
+        private void Update()
+        {
+            var nview = GetComponent<ZNetView>();
+            if (nview == null || !nview.IsValid() || !nview.IsOwner()) return;
+            if (_pendingMount == gameObject || IsRidden())
+            {
+                _emptySince = -1f;
+                return;
+            }
+
+            if (_emptySince < 0f) _emptySince = Time.time;
+            if (Time.time - _emptySince < 1f || Time.time - _bornAt < EmptyGrace) return;
+            _emptySince = -1f;
+            Despawn(gameObject);
+        }
+
+        private bool IsRidden()
+        {
+            var sadle = GetComponentInChildren<Sadle>(true);
+            if (Access.HaveRider(sadle)) return true;
+            var local = Player.m_localPlayer;
+            return local != null && local.transform.IsChildOf(transform);
         }
 
         protected void InitPet()
@@ -185,7 +221,6 @@ namespace ValheimMontarias.Prefabs
                 ForceUnseat(player);
                 existing.SetActive(false);
                 QueueDespawn(existing);
-                player.Message(MessageHud.MessageType.Center, "Seu aliado foi recolhido");
                 return;
             }
 
@@ -257,51 +292,70 @@ namespace ValheimMontarias.Prefabs
                 return;
             }
 
-            var rot = Quaternion.LookRotation(player.transform.forward);
+            // Right under the rider, facing where they face, and mounted in this same frame:
+            // the cast ends with the player in the saddle, not with a mount standing beside them.
+            var rot = Quaternion.LookRotation(Flat(player.transform.forward));
             var go = UnityEngine.Object.Instantiate(prefab, player.transform.position, rot);
             SetOwner(go, player);
             var tame = go.GetComponent<Tameable>();
             Access.Call(tame, "Tame");
             Access.SetSaddle(tame, true);
-            SetFollow(go, player, true);
             MountHub.ApplyAll(go);
             QueueAutoMount(go, player);
             TryFinishAutoMount();
-            player.Message(MessageHud.MessageType.Center, "Seu aliado foi invocado");
+        }
+
+        private static Vector3 Flat(Vector3 forward)
+        {
+            forward.y = 0f;
+            return forward.sqrMagnitude > 0.0001f ? forward.normalized : Vector3.forward;
         }
 
         private static void QueueAutoMount(GameObject go, Player player)
         {
             _pendingMount = go;
             _pendingMountPlayer = player;
-            _pendingMountUntil = Time.unscaledTime + 1.2f;
+            _pendingMountUntil = Time.unscaledTime + 1.5f;
         }
 
+        /// <summary>Keeps asking the saddle for control until the rider is on (normally the same
+        /// frame: the summoner owns the new mount, so the request is answered locally). A mount
+        /// that cannot be ridden is dismissed rather than left standing there.</summary>
         private static void TryFinishAutoMount()
         {
             if (_pendingMount == null) return;
-            if (!_pendingMount || Time.unscaledTime > _pendingMountUntil)
-            {
-                _pendingMount = null;
-                _pendingMountPlayer = null;
-                return;
-            }
-
+            var go = _pendingMount;
             var player = _pendingMountPlayer != null ? _pendingMountPlayer : Player.m_localPlayer;
-            if (player == null || CombatLock.IsInCombat(player))
-                return;
-            if (IsRiding(player))
+            if (!go)
             {
-                _pendingMount = null;
-                _pendingMountPlayer = null;
+                ClearPendingMount();
+                return;
+            }
+            if (player != null && IsRiding(player))
+            {
+                ClearPendingMount();
                 return;
             }
 
-            if (TryMount(_pendingMount, player))
+            string failure = null;
+            if (player == null || player.IsDead()) failure = "";
+            else if (CombatLock.IsInCombat(player)) failure = CombatLock.Message;
+            else if (Time.unscaledTime > _pendingMountUntil) failure = "Não foi possível montar aqui.";
+            if (failure != null)
             {
-                _pendingMount = null;
-                _pendingMountPlayer = null;
+                ClearPendingMount();
+                Despawn(go);
+                if (failure.Length > 0) player.Message(MessageHud.MessageType.Center, failure);
+                return;
             }
+
+            TryMount(go, player);
+        }
+
+        private static void ClearPendingMount()
+        {
+            _pendingMount = null;
+            _pendingMountPlayer = null;
         }
 
         private static void QueueDespawn(GameObject go)
@@ -662,8 +716,8 @@ namespace ValheimMontarias.Prefabs
             if (CombatLock.IsInCombat(player))
                 return "Em combate: não é possível usar a montaria";
             if (Access.IsAdmin())
-                return "[<color=yellow><b>E</b></color>] Ajustes da montaria (admin)\nU abre o menu  ·  H invoca/recolhe";
-            return "Use o apito para recolher a montaria.\nMontado: Espaço salta, clique investida";
+                return "[<color=yellow><b>E</b></color>] Ajustes da montaria (admin)\nU abre o menu  ·  H monta/desmonta";
+            return "H desmonta.\nMontado: Espaço salta, clique investida";
         }
     }
 }
