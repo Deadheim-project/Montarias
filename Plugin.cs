@@ -8,12 +8,13 @@ using ValheimMontarias.Prefabs;
 namespace ValheimMontarias
 {
     [BepInPlugin(Guid, Name, Version)]
+    [BepInDependency("Detalhes.Deadheim", BepInDependency.DependencyFlags.SoftDependency)]
     [BepInDependency("Detalhes.Combat", BepInDependency.DependencyFlags.SoftDependency)]
     public class Plugin : BaseUnityPlugin
     {
         public const string Guid = "com.valheimmontarias.mod";
         public const string Name = "ValheimMontarias";
-        public const string Version = "0.1.66";
+        public const string Version = "0.2.0";
 
         internal static ManualLogSource Log;
         private Harmony _harmony;

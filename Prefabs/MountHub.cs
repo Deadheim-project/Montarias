@@ -6,23 +6,18 @@ namespace ValheimMontarias.Prefabs
     {
         public static bool IsOurs(GameObject go)
         {
-            return BoarPrefab.IsOurs(go) || CentauroPrefab.IsOurs(go);
+            return BoarPrefab.IsOurs(go);
         }
 
         public static void ApplyAll(GameObject go)
         {
-            if (CentauroPrefab.IsOurs(go))
-                CentauroPrefab.ApplyAll(go);
-            else if (BoarPrefab.IsOurs(go))
+            if (BoarPrefab.IsOurs(go))
                 BoarPrefab.ApplyAll(go);
         }
 
         public static void FitSeat(GameObject go)
         {
-            if (CentauroPrefab.IsOurs(go))
-                CentauroPrefab.FitSeat(go);
-            else
-                BoarPrefab.FitSeat(go);
+            BoarPrefab.FitSeat(go);
         }
 
         public static void KeepHumanScale(Player player)

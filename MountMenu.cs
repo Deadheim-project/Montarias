@@ -14,15 +14,12 @@ namespace ValheimMontarias
 {
     internal sealed class MountMenu : MonoBehaviour
     {
-        private enum Tab { Mine, Shop, Admin }
+        private enum Tab { Mine, Admin }
 
         private static MountMenu _instance;
         private GameObject _canvas;
         private RectTransform _mineRoot;
         private RectTransform _mineList;
-        private RectTransform _shopRoot;
-        private RectTransform _shopGrid;
-        private TextMeshProUGUI _shopBalance;
         private RectTransform _adminRoot;
         private RectTransform _adminList;
         private RectTransform _adminEditor;
@@ -187,7 +184,6 @@ namespace ValheimMontarias
 
             _tabButtons.Clear();
             AddTab(tabStrip, "Minhas Montarias", Tab.Mine, 230f);
-            AddTab(tabStrip, "Loja de Montarias", Tab.Shop, 230f);
             AddTab(tabStrip, "Admin", Tab.Admin, 120f);
 
             var content = ValheimUi.CreateRect("Content", panel);
@@ -195,7 +191,6 @@ namespace ValheimMontarias
                 new Vector2(24f, 52f), new Vector2(-24f, -110f));
 
             _mineRoot = BuildMine(content);
-            _shopRoot = BuildShop(content);
             _adminRoot = BuildAdmin(content);
 
             _status = ValheimUi.CreateLabel(panel, HintText(), 14, ValheimUi.Muted, TextAlignmentOptions.Center);
@@ -221,24 +216,6 @@ namespace ValheimMontarias
             var area = ValheimUi.CreateRect("Area", frame);
             ValheimUi.Anchor(area, Vector2.zero, Vector2.one, new Vector2(6f, 6f), new Vector2(-6f, -6f));
             _mineList = ValheimUi.CreateScrollList(area, spacing: 6f);
-            return root;
-        }
-
-        private RectTransform BuildShop(Transform parent)
-        {
-            var root = ValheimUi.CreateRect("Shop", parent, false);
-            ValheimUi.Stretch(root, 0f, 0f);
-
-            _shopBalance = ValheimUi.CreateLabel(root, "", 16, ValheimUi.Yellow, TextAlignmentOptions.Center);
-            ValheimUi.Anchor((RectTransform)_shopBalance.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(8f, -32f), new Vector2(-8f, -4f));
-
-            var frame = ValheimUi.CreateInlay(root, "ShopFrame");
-            ValheimUi.Anchor(frame, Vector2.zero, Vector2.one, new Vector2(0f, 0f), new Vector2(0f, -36f));
-
-            var area = ValheimUi.CreateRect("Area", frame);
-            ValheimUi.Anchor(area, Vector2.zero, Vector2.one, new Vector2(6f, 6f), new Vector2(-6f, -6f));
-            _shopGrid = ValheimUi.CreateScrollGrid(area, new Vector2(280f, 340f), 2, new Vector2(18f, 18f));
             return root;
         }
 
@@ -271,7 +248,6 @@ namespace ValheimMontarias
 
             _tab = tab;
             if (_mineRoot != null) _mineRoot.gameObject.SetActive(tab == Tab.Mine);
-            if (_shopRoot != null) _shopRoot.gameObject.SetActive(tab == Tab.Shop);
             if (_adminRoot != null) _adminRoot.gameObject.SetActive(tab == Tab.Admin);
 
             for (int i = 0; i < _tabButtons.Count; i++)
@@ -286,13 +262,10 @@ namespace ValheimMontarias
 
             if (_header != null)
             {
-                _header.text = tab == Tab.Mine ? "Minhas Montarias"
-                    : tab == Tab.Shop ? "Loja de Montarias"
-                    : "Admin";
+                _header.text = tab == Tab.Mine ? "Minhas Montarias" : "Admin";
             }
 
             if (tab == Tab.Mine) RebuildMine();
-            else if (tab == Tab.Shop) RebuildShop();
             else RebuildAdmin();
             Say(HintText());
         }
@@ -306,7 +279,7 @@ namespace ValheimMontarias
             if (owned.Count == 0)
             {
                 var empty = ValheimUi.CreateLabel(_mineList,
-                    "Você não possui nenhuma montaria, adquira já na loja",
+                    "Você ainda não possui nenhuma montaria.",
                     18, ValheimUi.Beige, TextAlignmentOptions.Center);
                 ValheimUi.SetHeight(empty.gameObject, 80f);
             }
@@ -343,78 +316,6 @@ namespace ValheimMontarias
                     }
                 }
             }
-
-            var buy = ValheimUi.CreateButton(_mineList, "Adquirir Montaria", 0f, 44f, 16);
-            buy.onClick.AddListener(() => SetTab(Tab.Shop));
-            Track(buy.gameObject);
-        }
-
-        private void RebuildShop()
-        {
-            ClearChildren(_shopGrid);
-            var player = Player.m_localPlayer;
-            if (_shopBalance != null)
-                _shopBalance.text = $"Suas coins: {MountWallet.Count(player)}";
-
-            var all = MountSettings.All;
-            if (all == null) return;
-            for (int i = 0; i < all.Length; i++)
-            {
-                var profile = all[i];
-                if (profile == null) continue;
-                BuildShopCard(profile, player);
-            }
-        }
-
-        private void BuildShopCard(MountProfile profile, Player player)
-        {
-            var card = ValheimUi.CreateRect("Card", _shopGrid);
-            Track(card.gameObject);
-            var fill = card.gameObject.AddComponent<Image>();
-            fill.color = new Color(0f, 0f, 0f, 0.45f);
-
-            var col = card.gameObject.AddComponent<VerticalLayoutGroup>();
-            col.padding = new RectOffset(12, 12, 12, 12);
-            col.spacing = 8f;
-            col.childAlignment = TextAnchor.UpperCenter;
-            col.childControlWidth = true;
-            col.childControlHeight = true;
-            col.childForceExpandWidth = true;
-            col.childForceExpandHeight = false;
-
-            var art = ValheimUi.CreateRect("Art", card);
-            ValheimUi.SetHeight(art.gameObject, 190f);
-            var image = art.gameObject.AddComponent<Image>();
-            image.preserveAspect = true;
-            image.raycastTarget = false;
-            image.sprite = IconOf(profile.ShopImageFile, shop: true);
-            image.enabled = image.sprite != null;
-            if (image.sprite == null)
-                image.sprite = IconOf(profile.IconFile);
-
-            var name = ValheimUi.CreateLabel(card, profile.Name, 18, ValheimUi.Orange,
-                TextAlignmentOptions.Center, display: true);
-            ValheimUi.SetHeight(name.gameObject, 28f);
-
-            bool owned = MountRoster.Owns(player, profile);
-            int price = profile.ShopPrice != null ? Mathf.Max(0, profile.ShopPrice.Value) : 50;
-            var button = ValheimUi.CreateButton(card, owned ? "Já possui" : $"{price} coins", 0f, 40f, 16);
-            button.interactable = !owned;
-            if (owned && button.image != null)
-                button.image.color = new Color(0.55f, 0.55f, 0.55f, 1f);
-            if (!owned)
-            {
-                button.onClick.AddListener(() =>
-                {
-                    if (MountRoster.TryBuy(Player.m_localPlayer, profile, out string msg))
-                    {
-                        Select(profile);
-                        RebuildShop();
-                        RebuildMine();
-                    }
-                    Say(msg);
-                });
-            }
         }
 
         private void RebuildAdmin()
@@ -438,7 +339,6 @@ namespace ValheimMontarias
                     MountSettings.UnlockAll.Value = !MountSettings.UnlockAll.Value;
                 RebuildAdmin();
                 RebuildMine();
-                RebuildShop();
             });
             Track(unlock.gameObject);
 
@@ -477,26 +377,6 @@ namespace ValheimMontarias
                 Say("Nome atualizado.");
             });
 
-            Heading("Preço na loja (coins)");
-            var priceRow = Row(40f);
-            var priceField = ValheimUi.CreateInputField(priceRow,
-                (selected.ShopPrice != null ? selected.ShopPrice.Value : 50).ToString(CultureInfo.InvariantCulture),
-                120f, 38f);
-            Flex(priceField.gameObject);
-            var savePrice = ValheimUi.CreateButton(priceRow, "Salvar preço", 150f, 38f, 14);
-            savePrice.onClick.AddListener(() =>
-            {
-                if (selected.ShopPrice == null) return;
-                if (!int.TryParse(priceField.text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int price)
-                    || price < 0)
-                {
-                    Say("Preço inválido.");
-                    return;
-                }
-                selected.ShopPrice.Value = price;
-                Say($"Preço de {selected.Name}: {price} coins.");
-            });
-
             AddStat("Velocidade", selected.RunSpeed, 3f, 30f);
             AddStat("Pulo", selected.JumpHeight, 3f, 20f);
             AddStat("Escala", selected.Scale, 0.5f, 3f);
@@ -511,7 +391,6 @@ namespace ValheimMontarias
                 Select(selected);
                 Say($"{selected.Name} liberada para você.");
                 RebuildMine();
-                RebuildShop();
             });
             Track(grant.gameObject);
 
@@ -589,9 +468,6 @@ namespace ValheimMontarias
             ClearTracked();
             _mineRoot = null;
             _mineList = null;
-            _shopRoot = null;
-            _shopGrid = null;
-            _shopBalance = null;
             _adminRoot = null;
             _adminList = null;
             _adminEditor = null;
@@ -630,20 +506,19 @@ namespace ValheimMontarias
             if (_status != null) _status.text = text ?? "";
         }
 
-        private Sprite IconOf(string fileName, bool shop = false)
+        private Sprite IconOf(string fileName)
         {
             if (string.IsNullOrEmpty(fileName)) return null;
-            string key = shop ? "shop/" + fileName : fileName;
-            if (_icons.TryGetValue(key, out var cached) && cached != null)
+            if (_icons.TryGetValue(fileName, out var cached) && cached != null)
                 return cached;
-            var sprite = LoadSprite(fileName, shop);
-            _icons[key] = sprite;
+            var sprite = LoadSprite(fileName);
+            _icons[fileName] = sprite;
             return sprite;
         }
 
-        private static Sprite LoadSprite(string fileName, bool shop)
+        private static Sprite LoadSprite(string fileName)
         {
-            string path = FindPng(fileName, shop);
+            string path = FindPng(fileName);
             if (path == null)
             {
                 Plugin.Log.LogWarning($"ValheimMontarias: ícone não encontrado ({fileName})");
@@ -658,12 +533,10 @@ namespace ValheimMontarias
             return Sprite.Create(tex, new Rect(0f, 0f, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
         }
 
-        private static string FindPng(string fileName, bool shop)
+        private static string FindPng(string fileName)
         {
             string root = Path.Combine(Paths.PluginPath, "ValheimMontarias", "Assets");
-            var folders = shop
-                ? new[] { "Shop", "shop", "Menu", "menu", "" }
-                : new[] { "Menu", "menu", "Shop", "shop", "" };
+            var folders = new[] { "Menu", "menu", "" };
             for (int i = 0; i < folders.Length; i++)
             {
                 string path = string.IsNullOrEmpty(folders[i])

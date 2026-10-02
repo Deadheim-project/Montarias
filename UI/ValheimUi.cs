@@ -384,51 +384,6 @@ namespace ValheimMontarias.UI
             return content;
         }
 
-        /// <summary>Scrolling grid of fixed-size cards, used by the mount shop.</summary>
-        public static RectTransform CreateScrollGrid(Transform parent, Vector2 cellSize, int columns = 2,
-            Vector2? spacing = null)
-        {
-            const float barWidth = 12f;
-
-            var viewport = CreateRect("Viewport", parent);
-            viewport.anchorMin = Vector2.zero;
-            viewport.anchorMax = Vector2.one;
-            viewport.offsetMin = Vector2.zero;
-            viewport.offsetMax = new Vector2(-(barWidth + 3f), 0f);
-            viewport.gameObject.AddComponent<RectMask2D>();
-
-            var content = CreateRect("Content", viewport);
-            content.anchorMin = new Vector2(0f, 1f);
-            content.anchorMax = new Vector2(1f, 1f);
-            content.pivot = new Vector2(0.5f, 1f);
-            content.anchoredPosition = Vector2.zero;
-            content.sizeDelta = new Vector2(0f, 0f);
-
-            var grid = content.gameObject.AddComponent<GridLayoutGroup>();
-            grid.cellSize = cellSize;
-            grid.spacing = spacing ?? new Vector2(16f, 16f);
-            grid.padding = new RectOffset(10, 10, 10, 10);
-            grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-            grid.constraintCount = Mathf.Max(1, columns);
-            grid.childAlignment = TextAnchor.UpperCenter;
-            grid.startAxis = GridLayoutGroup.Axis.Horizontal;
-            grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
-
-            var fitter = content.gameObject.AddComponent<ContentSizeFitter>();
-            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-            var scroll = viewport.gameObject.AddComponent<ScrollRect>();
-            scroll.content = content;
-            scroll.viewport = viewport;
-            scroll.horizontal = false;
-            scroll.vertical = true;
-            scroll.movementType = ScrollRect.MovementType.Clamped;
-            scroll.scrollSensitivity = 40f;
-
-            AddScrollbar(scroll, viewport, barWidth);
-            return content;
-        }
-
         private static void AddScrollbar(ScrollRect scroll, RectTransform viewport, float barWidth)
         {
             var bar = CreateRect("Scrollbar", viewport.parent);

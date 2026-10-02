@@ -197,7 +197,6 @@ namespace ValheimMontarias.Prefabs
         public static bool IsOurs(GameObject go)
         {
             if (go == null) return false;
-            if (go.GetComponent<CentauroControl>() != null) return false;
             return go.name.StartsWith(PrefabName, StringComparison.Ordinal)
                 || go.GetComponent<JavaliControl>() != null;
         }

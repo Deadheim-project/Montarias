@@ -161,20 +161,12 @@ namespace ValheimMontarias.Prefabs
             TrySummonProfile(player, MountSettings.Javali);
         }
 
-        public static void TrySummon(Player player, ItemDrop.ItemData whistle)
-        {
-            if (WhistleItem.IsCentauro(whistle))
-                TrySummonProfile(player, MountSettings.Centauro);
-            else
-                TrySummonProfile(player, MountSettings.Javali);
-        }
-
         internal static void TrySummonProfile(Player player, MountProfile profile)
         {
             if (player == null) return;
             if (profile == null)
             {
-                player.Message(MessageHud.MessageType.Center, "Você não possui nenhuma montaria, adquira já na DeadShop");
+                player.Message(MessageHud.MessageType.Center, "Você ainda não possui nenhuma montaria.");
                 return;
             }
             if (!MountRoster.Owns(player, profile))
@@ -259,7 +251,7 @@ namespace ValheimMontarias.Prefabs
 
             string prefabName = string.IsNullOrEmpty(_castPrefab) ? BoarPrefab.PrefabName : _castPrefab;
             var prefab = scene.GetPrefab(prefabName)
-                ?? (prefabName == CentauroPrefab.PrefabName ? CentauroPrefab.Prefab : BoarPrefab.Prefab);
+                ?? (prefabName == BoarPrefab.PrefabName ? BoarPrefab.Prefab : null);
             if (prefab == null)
             {
                 player.Message(MessageHud.MessageType.Center, "A montaria ainda não está pronta.");

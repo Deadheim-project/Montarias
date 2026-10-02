@@ -25,8 +25,6 @@ namespace ValheimMontarias
         public ConfigEntry<float> MaxHealth;
         public ConfigEntry<float> MaxStamina;
         public ConfigEntry<float> StaminaDrain;
-        public ConfigEntry<int> ShopPrice;
-        public string ShopImageFile;
 
         public MountProfile(string id, string defaultName, Func<GameObject, bool> isInstance, Action applyAll)
         {
@@ -51,7 +49,6 @@ namespace ValheimMontarias
     internal static class MountSettings
     {
         public static MountProfile Javali { get; private set; }
-        public static MountProfile Centauro { get; private set; }
         public static MountProfile[] All { get; private set; }
 
         public static ConfigEntry<float> RunSpeed => Javali?.RunSpeed;
@@ -81,28 +78,19 @@ namespace ValheimMontarias
         {
             Javali = new MountProfile("javali", BoarPrefab.DisplayName, BoarPrefab.IsOurs, BoarPrefab.ApplyToAll)
             {
-                IconFile = "Apito_Capivara.png",
-                ShopImageFile = "Capivara_Shop.png",
+                IconFile = "apito_capivara.png",
                 PrefabName = BoarPrefab.PrefabName
             };
             BindProfile(plugin, sync, Javali, "Montaria", 12f, 5.5f, 8.5f, 1f, 2f, 100f, 250f, 8f);
 
-            Centauro = new MountProfile("centauro", CentauroPrefab.DisplayName, CentauroPrefab.IsOurs, CentauroPrefab.ApplyToAll)
-            {
-                IconFile = "Apito_Centauro.png",
-                ShopImageFile = "Centauro_Shop.png",
-                PrefabName = CentauroPrefab.PrefabName
-            };
-            BindProfile(plugin, sync, Centauro, "Centauro", 14f, 6f, 9f, 1f, 2f, 200f, 300f, 7f);
-
-            All = new[] { Javali, Centauro };
+            All = new[] { Javali };
 
             LockConfig = plugin.Config.Bind("Geral", "LockConfig", true,
                 "Clientes usam a config do servidor.");
             sync.AddLockingConfigEntry(LockConfig);
 
             UnlockAll = Bind(plugin, sync, "Geral", "LiberarTodasGratis", false,
-                "Se ligado, todas as montarias ficam disponíveis sem comprar na loja.");
+                "Se ligado, todas as montarias ficam disponíveis para todos, sem precisar liberar.");
 
             MenuKey = plugin.Config.Bind("Geral", "TeclaMenu", new KeyboardShortcut(KeyCode.U),
                 "Abre o menu de montarias.");
@@ -145,7 +133,6 @@ namespace ValheimMontarias
             profile.MaxHealth = Bind(plugin, sync, group, "Vida", health, "Vida máxima da montaria.");
             profile.MaxStamina = Bind(plugin, sync, group, "Stamina", stamina, "Stamina máxima da montaria.");
             profile.StaminaDrain = Bind(plugin, sync, group, "DrenoStamina", drain, "Stamina gasta por segundo ao correr.");
-            profile.ShopPrice = Bind(plugin, sync, group, "PrecoLoja", 50, "Preço em coins na loja de montarias.");
 
             profile.CustomName.SettingChanged += (_, __) => profile.ApplyAll();
             profile.RunSpeed.SettingChanged += (_, __) => profile.ApplyAll();

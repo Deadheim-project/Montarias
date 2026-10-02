@@ -93,21 +93,16 @@
     <Target Name="CopyToPlugins" AfterTargets="Build">
     <MakeDir Directories="$(BepInExPlugins)\ValheimMontarias" Condition="!Exists('$(BepInExPlugins)\ValheimMontarias')" />
     <MakeDir Directories="$(BepInExPlugins)\ValheimMontarias\Assets" Condition="!Exists('$(BepInExPlugins)\ValheimMontarias\Assets')" />
-    <MakeDir Directories="$(BepInExPlugins)\ValheimMontarias\Assets\Shop" Condition="!Exists('$(BepInExPlugins)\ValheimMontarias\Assets\Shop')" />
     <MakeDir Directories="$(BepInExPlugins)\ValheimMontarias\Assets\Menu" Condition="!Exists('$(BepInExPlugins)\ValheimMontarias\Assets\Menu')" />
     <Copy SourceFiles="$(TargetDir)$(AssemblyName).dll" DestinationFolder="$(BepInExPlugins)\ValheimMontarias" ContinueOnError="true" Retries="1" RetryDelayMilliseconds="250" />
     <ItemGroup>
       <MountAsset Include="$(ProjectDir)Assets\*.bin;$(ProjectDir)Assets\*.png;$(ProjectDir)Assets\*.skin" />
-      <ShopAsset Include="$(ProjectDir)..\Assets\Shop\*.png;$(ProjectDir)Assets\shop\*.png;$(ProjectDir)Assets\Shop\*.png" />
       <MenuAsset Include="$(ProjectDir)..\Assets\Menu\*.png;$(ProjectDir)Assets\Menu\*.png;$(ProjectDir)Assets\menu\*.png" />
     </ItemGroup>
     <Copy SourceFiles="@(MountAsset)"
           DestinationFolder="$(BepInExPlugins)\ValheimMontarias\Assets"
           SkipUnchangedFiles="true"
           Condition="Exists('$(ProjectDir)Assets')" />
-    <Copy SourceFiles="@(ShopAsset)"
-          DestinationFolder="$(BepInExPlugins)\ValheimMontarias\Assets\Shop"
-          SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(MenuAsset)"
           DestinationFolder="$(BepInExPlugins)\ValheimMontarias\Assets\Menu"
           SkipUnchangedFiles="true" />

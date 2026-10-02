@@ -1,15 +1,16 @@
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace ValheimMontarias
 {
     /// <summary>
-    /// Which mounts a player owns. Purchases from the in-menu shop write a comma-separated
-    /// id list on the player's ZDO. LiberarTodas still grants everything for testing.
+    /// Which mounts a player owns: a comma-separated id list in Player.m_customData, which
+    /// the game saves in the character file. The player's ZDO is recreated on every login,
+    /// so a list kept only there was lost on relog; it is still read once and migrated.
+    /// LiberarTodasGratis grants everything.
     /// </summary>
     internal static class MountRoster
     {
-        private const string ZdoKey = "vm_owned";
+        private const string Key = "vm_owned";
 
         public static bool Owns(Player player, MountProfile profile)
         {
@@ -40,41 +41,20 @@ namespace ValheimMontarias
             Save(player, ids);
         }
 
-        public static bool TryBuy(Player player, MountProfile profile, out string message)
-        {
-            message = "";
-            if (player == null || profile == null)
-            {
-                message = "Não foi possível comprar.";
-                return false;
-            }
-
-            if (Owns(player, profile))
-            {
-                message = "Você já possui esta montaria.";
-                return false;
-            }
-
-            int price = profile.ShopPrice != null ? Mathf.Max(0, profile.ShopPrice.Value) : 50;
-            if (price > 0 && !MountWallet.TryPay(player, price))
-            {
-                message = $"Moedas insuficientes. Custa {price} coins.";
-                return false;
-            }
-
-            Grant(player, profile);
-            message = price > 0
-                ? $"{profile.Name} adquirida por {price} coins."
-                : $"{profile.Name} adquirida.";
-            return true;
-        }
-
         private static HashSet<string> OwnedIds(Player player)
         {
             var ids = new HashSet<string>();
-            var zdo = ZdoOf(player);
-            if (zdo == null) return ids;
-            string raw = zdo.GetString(ZdoKey, "");
+            string raw = null;
+            var data = CustomData(player);
+            if (data != null)
+                data.TryGetValue(Key, out raw);
+            if (string.IsNullOrEmpty(raw))
+            {
+                var zdo = ZdoOf(player);
+                raw = zdo != null ? zdo.GetString(Key, "") : "";
+                if (!string.IsNullOrEmpty(raw) && data != null)
+                    data[Key] = raw;
+            }
             if (string.IsNullOrEmpty(raw)) return ids;
             var parts = raw.Split(',');
             for (int i = 0; i < parts.Length; i++)
@@ -87,9 +67,18 @@ namespace ValheimMontarias
 
         private static void Save(Player player, HashSet<string> ids)
         {
+            string raw = string.Join(",", ids);
+            var data = CustomData(player);
+            if (data != null)
+                data[Key] = raw;
             var zdo = ZdoOf(player);
-            if (zdo == null) return;
-            zdo.Set(ZdoKey, string.Join(",", ids));
+            if (zdo != null)
+                zdo.Set(Key, raw);
+        }
+
+        private static IDictionary<string, string> CustomData(Player player)
+        {
+            return Access.Get(player, "m_customData") as IDictionary<string, string>;
         }
 
         private static ZDO ZdoOf(Player player)

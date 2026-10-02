@@ -1,19 +1,31 @@
 namespace ValheimMontarias
 {
     /// <summary>
-    /// Soft link to Detalhes.Combat. If that mod is not installed, the status never
-    /// exists and these checks stay false.
+    /// Soft link to the combat status of other mods. Deadheim (Detalhes.Deadheim) shows
+    /// "DH_Combat" while its CombatStatusIcon is on; the old standalone Detalhes.Combat used
+    /// "Combat". Without either mod the status never exists and these checks stay false.
     /// </summary>
     internal static class CombatLock
     {
-        public static readonly int StatusHash = "Combat".GetStableHashCode();
+        private static readonly int[] StatusHashes =
+        {
+            "DH_Combat".GetStableHashCode(),
+            "Combat".GetStableHashCode()
+        };
+
         public const string Message = "Você não pode usar montarias em combate.";
 
         public static bool IsInCombat(Player player)
         {
             if (player == null) return false;
             var seman = player.GetSEMan();
-            return seman != null && seman.HaveStatusEffect(StatusHash);
+            if (seman == null) return false;
+            for (int i = 0; i < StatusHashes.Length; i++)
+            {
+                if (seman.HaveStatusEffect(StatusHashes[i]))
+                    return true;
+            }
+            return false;
         }
 
         public static bool Block(Player player)

@@ -9,13 +9,7 @@ namespace ValheimMontarias.Prefabs
         public const string DisplayDesc =
             "U abre o menu, H invoca ou recolhe. Admin: aba Admin ou E na montaria.";
 
-        public const string CentauroItemName = "ApitoCentauro";
-        public const string CentauroDisplayName = "Apito do Centauro";
-        public const string CentauroDisplayDesc =
-            "U abre o menu, H invoca ou recolhe. Admin: aba Admin ou E na montaria.";
-
         internal static GameObject ItemPrefab { get; private set; }
-        internal static GameObject CentauroItem { get; private set; }
 
         private static Transform _hidden;
 
@@ -41,18 +35,9 @@ namespace ValheimMontarias.Prefabs
             return name == DisplayName || name == "Apito do Javali" || name == "$item_apitojavali";
         }
 
-        public static bool IsCentauro(ItemDrop.ItemData item)
-        {
-            if (!CanBeWhistle(item)) return false;
-            if (item.m_dropPrefab != null)
-                return item.m_dropPrefab.name == CentauroItemName;
-            var name = item.m_shared.m_name;
-            return name == CentauroDisplayName || name == "$item_apitocentauro";
-        }
-
         public static bool IsWhistle(ItemDrop.ItemData item)
         {
-            return IsCapybara(item) || IsCentauro(item);
+            return IsCapybara(item);
         }
 
         private static bool CanBeWhistle(ItemDrop.ItemData item)
@@ -72,8 +57,6 @@ namespace ValheimMontarias.Prefabs
             if (db == null) return;
             ItemPrefab = RegisterOne(db, ItemPrefab, PrefabName, DisplayName, DisplayDesc,
                 "TrophyBoar", "BoarHide", "Club", "Wood");
-            CentauroItem = RegisterOne(db, CentauroItem, CentauroItemName, CentauroDisplayName, CentauroDisplayDesc,
-                "TrophyLox", "LoxPelt", "TrophyBoar", "Club");
         }
 
         private static GameObject RegisterOne(ObjectDB db, GameObject cached, string prefabName, string displayName, string desc, params string[] templates)
@@ -122,13 +105,11 @@ namespace ValheimMontarias.Prefabs
         public static void RegisterScene(ZNetScene scene)
         {
             Access.AddScenePrefab(scene, ItemPrefab);
-            Access.AddScenePrefab(scene, CentauroItem);
         }
 
         public static void FinishScene(ZNetScene scene)
         {
             Access.EnsureNamedPrefab(scene, ItemPrefab);
-            Access.EnsureNamedPrefab(scene, CentauroItem);
         }
 
         private static void ApplyStats(GameObject prefab, string displayName, string desc)

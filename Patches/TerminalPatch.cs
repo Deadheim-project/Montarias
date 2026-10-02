@@ -12,10 +12,6 @@ namespace ValheimMontarias.Patches
             {
                 MountMenu.Open();
             });
-            _ = new Terminal.ConsoleCommand("centauro", "Opens the mount menu", args =>
-            {
-                MountMenu.Open();
-            });
         }
     }
 }

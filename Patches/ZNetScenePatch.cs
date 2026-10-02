@@ -15,7 +15,6 @@ namespace ValheimMontarias.Patches
                     WhistleItem.RegisterItem(ObjectDB.instance);
             });
             Try("register capybara", () => BoarPrefab.Register(__instance));
-            Try("register centaur", () => CentauroPrefab.Register(__instance));
             Try("register whistles", () => WhistleItem.RegisterScene(__instance));
         }
 
@@ -23,7 +22,6 @@ namespace ValheimMontarias.Patches
         private static void Postfix(ZNetScene __instance)
         {
             Try("finish capybara", () => BoarPrefab.Finish(__instance));
-            Try("finish centaur", () => CentauroPrefab.Finish(__instance));
             Try("finish whistles", () => WhistleItem.FinishScene(__instance));
         }
 
