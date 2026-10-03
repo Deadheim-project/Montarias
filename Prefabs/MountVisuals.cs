@@ -223,7 +223,7 @@ namespace ValheimMontarias.Prefabs
 
         private static string AssetPath(string fileName)
         {
-            return Path.Combine(Paths.PluginPath, "ValheimMontarias", "Assets", fileName);
+            return Path.Combine(Plugin.AssetsDir, fileName);
         }
     }
 }

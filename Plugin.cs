@@ -16,6 +16,11 @@ namespace ValheimMontarias
         public const string Version = "0.1.66";
 
         internal static ManualLogSource Log;
+
+        // Pasta Assets ao lado da DLL: o launcher instala em plugins/<id do manifest>,
+        // nao em plugins/ValheimMontarias, entao o caminho nao pode ser fixo.
+        internal static readonly string AssetsDir = System.IO.Path.Combine(
+            System.IO.Path.GetDirectoryName(typeof(Plugin).Assembly.Location), "Assets");
         private Harmony _harmony;
         private bool _consoleWasEnabled;
         private bool _consoleWasVisible;

@@ -660,7 +660,7 @@ namespace ValheimMontarias
 
         private static string FindPng(string fileName, bool shop)
         {
-            string root = Path.Combine(Paths.PluginPath, "ValheimMontarias", "Assets");
+            string root = Path.Combine(Plugin.AssetsDir);
             var folders = shop
                 ? new[] { "Shop", "shop", "Menu", "menu", "" }
                 : new[] { "Menu", "menu", "Shop", "shop", "" };
