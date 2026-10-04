@@ -693,7 +693,7 @@ namespace ValheimMontarias
         private static string HintText()
         {
             string menu = MountSettings.MenuKey != null ? MountSettings.MenuKey.Value.MainKey.ToString() : "U";
-            string summon = MountSettings.SummonKey != null ? MountSettings.SummonKey.Value.MainKey.ToString() : "H";
+            string summon = MountSettings.SummonKey != null ? MountSettings.SummonKey.Value.MainKey.ToString() : "O";
             return $"{menu} fecha  ·  {summon} invoca  ·  Esc fecha";
         }
 

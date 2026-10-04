@@ -15,7 +15,7 @@ namespace ValheimMontarias.Patches
             if (__instance != Player.m_localPlayer) return true;
             var item = FindHotbarItem(__instance, index);
             if (!WhistleItem.IsWhistle(item)) return true;
-            __instance.Message(MessageHud.MessageType.Center, "Use U para abrir o menu de montarias. H invoca.");
+            __instance.Message(MessageHud.MessageType.Center, "Use " + MountSettings.KeysHint("invoca") + ".");
             return false;
         }
 
@@ -41,7 +41,7 @@ namespace ValheimMontarias.Patches
         {
             if (!(__instance is Player player) || player != Player.m_localPlayer) return true;
             if (!WhistleItem.IsWhistle(item)) return true;
-            player.Message(MessageHud.MessageType.Center, "Use U para abrir o menu de montarias. H invoca.");
+            player.Message(MessageHud.MessageType.Center, "Use " + MountSettings.KeysHint("invoca") + ".");
             return false;
         }
     }
@@ -56,7 +56,7 @@ namespace ValheimMontarias.Patches
         {
             if (__instance != Player.m_localPlayer) return true;
             if (!WhistleItem.IsWhistle(item)) return true;
-            __instance.Message(MessageHud.MessageType.Center, "Use U para abrir o menu de montarias. H invoca.");
+            __instance.Message(MessageHud.MessageType.Center, "Use " + MountSettings.KeysHint("invoca") + ".");
             return false;
         }
     }
@@ -71,7 +71,7 @@ namespace ValheimMontarias.Patches
         {
             if (__instance != Player.m_localPlayer) return true;
             if (!WhistleItem.IsWhistle(item)) return true;
-            __instance.Message(MessageHud.MessageType.Center, "Use U para abrir o menu de montarias. H invoca.");
+            __instance.Message(MessageHud.MessageType.Center, "Use " + MountSettings.KeysHint("invoca") + ".");
             __result = true;
             return false;
         }
