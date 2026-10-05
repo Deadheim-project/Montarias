@@ -18,10 +18,10 @@ namespace ValheimMontarias.Patches
             if (loc == null) return;
             Add(loc, "item_apitojavali", "Apito da Capivara");
             Add(loc, "item_apitojavali_desc",
-                "U abre o menu, H invoca ou recolhe. Admin: aba Admin ou E na montaria.");
+                MountSettings.KeysHint() + ". Admin: aba Admin ou E na montaria.");
             Add(loc, "item_apitocentauro", "Apito do Centauro");
             Add(loc, "item_apitocentauro_desc",
-                "U abre o menu, H invoca ou recolhe. Admin: aba Admin ou E na montaria.");
+                MountSettings.KeysHint() + ". Admin: aba Admin ou E na montaria.");
         }
 
         private static void Add(Localization loc, string key, string value)

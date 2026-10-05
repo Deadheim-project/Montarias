@@ -672,7 +672,7 @@ namespace ValheimMontarias.Prefabs
             if (CombatLock.IsInCombat(player))
                 return "Em combate: não é possível usar a montaria";
             if (Access.IsAdmin())
-                return "[<color=yellow><b>E</b></color>] Ajustes da montaria (admin)\nU abre o menu  ·  H invoca/recolhe";
+                return "[<color=yellow><b>E</b></color>] Ajustes da montaria (admin)\n" + MountSettings.KeysHint("invoca/recolhe");
             return "Use o apito para recolher a montaria.\nMontado: Espaço salta, clique investida";
         }
     }

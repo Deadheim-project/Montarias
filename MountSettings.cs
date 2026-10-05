@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using BepInEx;
 using BepInEx.Configuration;
 using ServerSync;
@@ -106,16 +107,34 @@ namespace ValheimMontarias
 
             MenuKey = plugin.Config.Bind("Geral", "TeclaMenu", new KeyboardShortcut(KeyCode.U),
                 "Abre o menu de montarias.");
-            SummonKey = plugin.Config.Bind("Geral", "TeclaInvocar", new KeyboardShortcut(KeyCode.H),
+            SummonKey = plugin.Config.Bind("Geral", "TeclaInvocar", new KeyboardShortcut(KeyCode.I),
                 "Invoca ou recolhe a montaria selecionada.");
             SelectedMount = plugin.Config.Bind("Geral", "MontariaSelecionada", "javali",
                 "Id da última montaria escolhida no menu.");
+            var keysVersion = plugin.Config.Bind("Geral", "VersaoTeclas", 0,
+                "Uso interno: migração das teclas padrão. Não edite.");
 
             if (MenuKey.Value.MainKey == KeyCode.H && SummonKey.Value.MainKey == KeyCode.J)
             {
                 MenuKey.Value = new KeyboardShortcut(KeyCode.U);
-                SummonKey.Value = new KeyboardShortcut(KeyCode.H);
+                SummonKey.Value = new KeyboardShortcut(KeyCode.I);
             }
+            // 0.1.67: invocar saiu do H, que e o painel da Arena do NpcValheim. So uma vez, para nao
+            // desfazer quem escolher o H de proposito depois.
+            if (keysVersion.Value < 1)
+            {
+                if (SummonKey.Value.MainKey == KeyCode.H && SummonKey.Value.Modifiers.Count() == 0)
+                    SummonKey.Value = new KeyboardShortcut(KeyCode.I);
+                keysVersion.Value = 1;
+            }
+        }
+
+        /// <summary>Texto com as teclas configuradas, ex. "U abre o menu, I invoca ou recolhe".</summary>
+        public static string KeysHint(string summonVerb = "invoca ou recolhe")
+        {
+            string menu = MenuKey != null ? MenuKey.Value.ToString() : "U";
+            string summon = SummonKey != null ? SummonKey.Value.ToString() : "I";
+            return $"{menu} abre o menu, {summon} {summonVerb}";
         }
 
         public static MountProfile Find(GameObject go)

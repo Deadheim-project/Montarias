@@ -6,13 +6,13 @@ namespace ValheimMontarias.Prefabs
     {
         public const string PrefabName = "ApitoJavali";
         public const string DisplayName = "Apito da Capivara";
-        public const string DisplayDesc =
-            "U abre o menu, H invoca ou recolhe. Admin: aba Admin ou E na montaria.";
+        public static string DisplayDesc =>
+            MountSettings.KeysHint() + ". Admin: aba Admin ou E na montaria.";
 
         public const string CentauroItemName = "ApitoCentauro";
         public const string CentauroDisplayName = "Apito do Centauro";
-        public const string CentauroDisplayDesc =
-            "U abre o menu, H invoca ou recolhe. Admin: aba Admin ou E na montaria.";
+        public static string CentauroDisplayDesc =>
+            MountSettings.KeysHint() + ". Admin: aba Admin ou E na montaria.";
 
         internal static GameObject ItemPrefab { get; private set; }
         internal static GameObject CentauroItem { get; private set; }
