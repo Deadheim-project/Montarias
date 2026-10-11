@@ -237,14 +237,8 @@ namespace ValheimMontarias.Prefabs
         private static string ResolveAsset(MountProfile profile)
         {
             if (profile != null && !string.IsNullOrWhiteSpace(profile.VisualAsset))
-            {
-                var candidate = profile.VisualAsset.Trim();
-                if (File.Exists(Path.Combine(Paths.PluginPath, "ValheimMontarias", "Assets", candidate + ".skin")))
-                    return candidate;
-                if (File.Exists(Path.Combine(Paths.PluginPath, "ValheimMontarias", "Assets", candidate + ".png")))
-                    return candidate;
-            }
-            return "capybara";
+                return profile.VisualAsset.Trim();
+            return profile == null ? "capybara" : string.Empty;
         }
 
         private static string AssetPath(string fileName)

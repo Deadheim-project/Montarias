@@ -33,6 +33,7 @@ namespace ValheimMontarias
         public ConfigEntry<float> SaddleYOffset;
         public ConfigEntry<float> SaddleZOffset;
         public ConfigEntry<string> SaddlePrefab;
+        public ConfigEntry<float> LegSpread;
         public ConfigEntry<float> CastSeconds;
         public ConfigEntry<int> RequiredRank;
         public ConfigEntry<string> AllowedSteamIds;
@@ -205,6 +206,8 @@ namespace ValheimMontarias
                 "Deslocamento frente/trás da sela em unidades do modelo.");
             profile.SaddlePrefab = Bind(plugin, sync, group, "PrefabSela", "SaddleLox",
                 "Prefab de item da sela usado na aparência da montaria (ex.: SaddleLox, SaddleAsksvin).");
+            profile.LegSpread = Bind(plugin, sync, group, "AberturaPernas", 10f,
+                "Abertura das pernas do personagem montado, em graus (0 desativa; máximo efetivo: 45).");
             profile.CastSeconds = Bind(plugin, sync, group, "CastSegundos", cast, "Tempo de conjuração para invocar.");
             profile.RequiredRank = Bind(plugin, sync, group, "HabilidadeMinima", 1,
                 "Nível da Habilidade de Montaria exigido para invocar (1 = o primeiro nível).");

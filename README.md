@@ -65,7 +65,8 @@ por reflexão: catálogo (montarias, níveis), o estado do jogador local e, no s
 (`LockConfig = true`):
 
 - `[Montaria<id>]`: `Nome`, `VelocidadeCorrida`, `VelocidadeAndar`, `AlturaPulo`,
-  `Escala`, `PrefabSela`, `CastSegundos`, `HabilidadeMinima`.
+  `Escala`, `PrefabSela`, `AberturaPernas` (graus; `0` desativa), `CastSegundos`,
+  `HabilidadeMinima`.
 - `[Habilidade]`: `Niveis`.
 - `[Geral]`: `LockConfig`, `LiberarTodasGratis`, `TeclaMenu`, `TeclaInvocar`.
 

@@ -132,6 +132,7 @@ namespace ValheimMontarias.UI
         {
             var parent = FindGuiRoot();
             if (parent == null) return null;
+            EnsureEventSystem();
 
             var go = new GameObject(name, typeof(RectTransform), typeof(Canvas),
                 typeof(CanvasScaler), typeof(GraphicRaycaster)) { layer = UILayer };
@@ -154,6 +155,30 @@ namespace ValheimMontarias.UI
             go.GetComponent<CanvasScaler>().referencePixelsPerUnit = 50;
             go.transform.SetAsLastSibling();
             return go;
+        }
+
+        private static void EnsureEventSystem()
+        {
+            var eventSystem = EventSystem.current;
+            if (eventSystem == null)
+            {
+                eventSystem = Resources.FindObjectsOfTypeAll<EventSystem>()
+                    .FirstOrDefault(candidate => candidate != null && candidate.gameObject.scene.IsValid());
+            }
+
+            if (eventSystem == null)
+            {
+                var inputRoot = new GameObject("ValheimMontarias_EventSystem",
+                    typeof(EventSystem), typeof(StandaloneInputModule));
+                Object.DontDestroyOnLoad(inputRoot);
+                return;
+            }
+
+            eventSystem.enabled = true;
+            var inputModule = eventSystem.GetComponent<BaseInputModule>();
+            if (inputModule == null)
+                inputModule = eventSystem.gameObject.AddComponent<StandaloneInputModule>();
+            inputModule.enabled = true;
         }
 
         private static Transform FindGuiRoot()

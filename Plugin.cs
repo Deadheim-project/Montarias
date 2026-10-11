@@ -14,7 +14,7 @@ namespace ValheimMontarias
     {
         public const string Guid = "com.valheimmontarias.mod";
         public const string Name = "ValheimMontarias";
-        public const string Version = "0.3.5";
+        public const string Version = "0.3.10";
 
         internal static ManualLogSource Log;
         private Harmony _harmony;
@@ -83,6 +83,7 @@ namespace ValheimMontarias
         private void LateUpdate()
         {
             RescueConsole();
+            JavaliControl.ApplyRiderLegPose(Player.m_localPlayer);
         }
 
         private void OnGUI()

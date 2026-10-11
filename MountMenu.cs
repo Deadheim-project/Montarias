@@ -589,6 +589,7 @@ namespace ValheimMontarias
             AddStat("Velocidade", selected.RunSpeed, 3f, 30f);
             AddStat("Pulo", selected.JumpHeight, 3f, 20f);
             AddStat("Escala", selected.Scale, 0.5f, 3f);
+            AddStat("Abertura das pernas (graus)", selected.LegSpread, 0f, 45f);
             AddIntStat("Habilidade exigida (nível)", selected.RequiredRank, 1, Mathf.Max(1, RidingRanks.Count));
 
             var apply = ValheimUi.CreateButton(_adminEditor, "Aplicar stats", 0f, 42f, 15);

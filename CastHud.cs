@@ -5,9 +5,9 @@ namespace ValheimMontarias
 {
     internal static class CastHud
     {
-        private const float BarWidth = 300f;
-        private const float BarHeight = 24f;
-        private const float BottomOffset = 100f;
+        private const float BarWidth = 340f;
+        private const float BarHeight = 28f;
+        private const float BottomOffset = 150f;
 
         private static float _smoothProgress;
         private static float _animationTime;
@@ -58,25 +58,11 @@ namespace ValheimMontarias
             float pulse = 0.5f + 0.5f *
                 Mathf.Sin(_animationTime * 4f);
 
-            // Azul no início, dourado no meio e verde no final.
-            Color baseColor;
-
-            if (progress < 0.5f)
-            {
-                baseColor = Color.Lerp(
-                    new Color(0.20f, 0.65f, 1f),
-                    new Color(0.95f, 0.72f, 0.25f),
-                    progress * 2f
-                );
-            }
-            else
-            {
-                baseColor = Color.Lerp(
-                    new Color(0.95f, 0.72f, 0.25f),
-                    new Color(0.35f, 1f, 0.55f),
-                    (progress - 0.5f) * 2f
-                );
-            }
+            Color baseColor = Color.Lerp(
+                new Color(0.82f, 0.48f, 0.16f),
+                new Color(0.42f, 0.78f, 0.38f),
+                progress
+            );
 
             // Sombra externa.
             DrawRounded(
@@ -102,7 +88,7 @@ namespace ValheimMontarias
             // Fundo da barra.
             DrawRounded(
                 barRect,
-                new Color(0.045f, 0.055f, 0.075f, 0.96f),
+                new Color(0.055f, 0.075f, 0.065f, 0.98f),
                 1f
             );
 
@@ -117,7 +103,7 @@ namespace ValheimMontarias
                         baseColor.r,
                         baseColor.g,
                         baseColor.b,
-                        0.95f + pulse * 0.05f
+                        0.92f + pulse * 0.08f
                     ),
                     1f
                 );
@@ -158,16 +144,16 @@ namespace ValheimMontarias
             // Borda superior discreta.
             DrawRounded(
                 new Rect(x + 2f, y + 1f, width - 4f, 1f),
-                new Color(1f, 1f, 1f, 0.22f),
+                new Color(0.95f, 0.73f, 0.38f, 0.55f),
                 1f
             );
 
             // Texto central com o tempo restante.
-            GUI.color = Color.white;
+            GUI.color = new Color(0.96f, 0.82f, 0.57f, 1f);
 
             string text = progress >= 0.999f
-                ? "Montaria invocada!"
-                : $"Invocando montaria... {_remainingTime:0.0}s";
+                ? "MONTARIA INVOCADA"
+                : $"INVOCANDO MONTARIA   {_remainingTime:0.0}s";
 
             GUI.Label(barRect, text, _labelStyle);
 

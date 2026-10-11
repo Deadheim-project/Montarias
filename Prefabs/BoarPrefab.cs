@@ -97,7 +97,7 @@ namespace ValheimMontarias.Prefabs
                 go.transform.localScale = Vector3.one * size;
 
             HideSaddleVisuals(go);
-            MountVisuals.Apply(go);
+            MountVisuals.Apply(go, profile);
             FitSeat(go);
         }
 
@@ -310,6 +310,9 @@ namespace ValheimMontarias.Prefabs
             if (procreation != null)
                 procreation.enabled = false;
 
+            if (profile.Id == "eikthyr")
+                SuppressBossEffects(clone);
+
             AttachSaddle(scene, clone, tame, character);
             clone.AddComponent<JavaliControl>();
 
@@ -317,6 +320,47 @@ namespace ValheimMontarias.Prefabs
                 Prefab = clone;
             Access.AddScenePrefab(scene, clone);
             Plugin.Log.LogInfo($"ValheimMontarias: mount prefab {profile.Name} registered");
+        }
+
+        private static void SuppressBossEffects(GameObject mount)
+        {
+            var noEffects = new EffectList();
+            Access.Set(noEffects, "m_effectPrefabs", Array.Empty<EffectList.EffectData>());
+
+            foreach (var ai in mount.GetComponentsInChildren<BaseAI>(true))
+            {
+                Access.Set(ai, "m_alertedEffects", noEffects);
+                Access.Set(ai, "m_alertedMessage", string.Empty);
+                Access.Set(ai, "m_spawnMessage", string.Empty);
+            }
+
+            foreach (var ai in mount.GetComponentsInChildren<MonsterAI>(true))
+            {
+                Access.Set(ai, "m_wakeupEffects", noEffects);
+                Access.Set(ai, "m_sleepEffects", noEffects);
+            }
+
+            foreach (var attack in mount.GetComponentsInChildren<Attack>(true))
+            {
+                Access.Set(attack, "m_startEffect", noEffects);
+                Access.Set(attack, "m_hitEffect", noEffects);
+                Access.Set(attack, "m_hitTerrainEffect", noEffects);
+                Access.Set(attack, "m_triggerEffect", noEffects);
+                Access.Set(attack, "m_trailStartEffect", noEffects);
+                Access.Set(attack, "m_burstEffect", noEffects);
+                Access.Set(attack, "m_attackProjectile", null);
+                Access.Set(attack, "m_spawnOnTrigger", null);
+                Access.Set(attack, "m_spawnOnHit", null);
+            }
+
+            foreach (var particles in mount.GetComponentsInChildren<ParticleSystem>(true))
+            {
+                particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                var main = particles.main;
+                main.playOnAwake = false;
+                var emission = particles.emission;
+                emission.enabled = false;
+            }
         }
 
         public static void Finish(ZNetScene scene)
