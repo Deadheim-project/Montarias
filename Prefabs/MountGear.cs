@@ -197,11 +197,13 @@ namespace ValheimMontarias.Prefabs
             var saddle = new GameObject(VisualName);
             saddle.transform.SetParent(overlay, false);
             saddle.transform.localPosition = overlayLocal;
-            var configured = ConfiguredVisual(MountSettings.Find(mount));
+            var profile = MountSettings.Find(mount);
+            var configured = ConfiguredVisual(profile);
             Mesh mesh = configured?.Mesh ?? VisualMesh();
-            saddle.transform.localRotation = useCapturedRotation
+            var baseRotation = useCapturedRotation
                 ? configured?.Rotation ?? _saddleRot
                 : Quaternion.identity;
+            saddle.transform.localRotation = baseRotation * MountSettings.SaddleRotationFor(profile);
 
             Vector3 parentScale = overlay.lossyScale;
             float sx = Mathf.Max(0.01f, Mathf.Abs(parentScale.x));

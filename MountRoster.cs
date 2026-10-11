@@ -21,6 +21,9 @@ namespace ValheimMontarias
 
         public static float SpeedBonus => RidingRanks.SpeedOf(Rank);
 
+        /// <summary>What the local player's level does to every cast time (1 = nothing).</summary>
+        public static float CastMultiplier => RidingRanks.CastOf(Rank);
+
         public static bool Owns(MountProfile profile) =>
             profile != null && AllowedForLocalPlayer(profile) && (UnlockAll || RiderClient.Owns(profile.Id));
 

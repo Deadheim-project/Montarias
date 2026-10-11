@@ -14,7 +14,17 @@ namespace ValheimMontarias.Prefabs
             public Vector3 LastAppliedPosition;
         }
 
+        private sealed class ClothState
+        {
+            public Cloth Cloth;
+            public ClothSphereColliderPair[] Original;
+        }
+
         private readonly List<CapeTransformState> _capeTransforms = new List<CapeTransformState>();
+        private readonly List<ClothState> _cloths = new List<ClothState>();
+        private GameObject _capeBlocker;
+        private SphereCollider _blockFront;
+        private SphereCollider _blockBack;
         private Player _player;
         private Animator _animator;
         private Transform _leftLeg;
@@ -40,6 +50,7 @@ namespace ValheimMontarias.Prefabs
             }
 
             AdjustCape();
+            BlockCapeWithMount(mount);
             ApplyLegPose(mount.gameObject);
         }
 
@@ -134,6 +145,133 @@ namespace ValheimMontarias.Prefabs
             }
         }
 
+        /// <summary>
+        /// The cape is cloth that only knows the rider's own body, so it fell straight through
+        /// the mount's back. Two spheres along the mount's spine, under the seat, joined as a
+        /// capsule, are added to the cape's colliders while riding so it drapes over the back.
+        /// They are triggers on Ignore Raycast with no rigidbody: only the cloth sees them.
+        /// </summary>
+        private void BlockCapeWithMount(Character mount)
+        {
+            var cloths = _player.GetComponentsInChildren<Cloth>();
+            if (cloths.Length == 0)
+            {
+                ReleaseCapeCloth();
+                return;
+            }
+
+            EnsureCapeBlocker();
+            PlaceCapeBlocker(mount);
+
+            for (int i = 0; i < cloths.Length; i++)
+            {
+                var cloth = cloths[i];
+                var pairs = cloth.sphereColliders;
+                if (HasBlocker(pairs))
+                    continue;
+
+                var state = FindClothState(cloth);
+                if (state == null)
+                {
+                    state = new ClothState { Cloth = cloth };
+                    _cloths.Add(state);
+                }
+                // Taken again each time it is missing: equipping can rebuild the cape's list.
+                state.Original = pairs;
+
+                int count = pairs != null ? pairs.Length : 0;
+                var withMount = new ClothSphereColliderPair[count + 1];
+                if (count > 0)
+                    pairs.CopyTo(withMount, 0);
+                withMount[count] = new ClothSphereColliderPair(_blockFront, _blockBack);
+                cloth.sphereColliders = withMount;
+            }
+        }
+
+        private void EnsureCapeBlocker()
+        {
+            if (_capeBlocker != null)
+                return;
+            int layer = LayerMask.NameToLayer("Ignore Raycast");
+            _capeBlocker = new GameObject("MontariasCapeBlocker");
+            if (layer >= 0) _capeBlocker.layer = layer;
+            _blockFront = CreateBlockSphere("Front", layer);
+            _blockBack = CreateBlockSphere("Back", layer);
+        }
+
+        private SphereCollider CreateBlockSphere(string name, int layer)
+        {
+            var go = new GameObject(name);
+            if (layer >= 0) go.layer = layer;
+            go.transform.SetParent(_capeBlocker.transform, false);
+            var sphere = go.AddComponent<SphereCollider>();
+            sphere.isTrigger = true;
+            return sphere;
+        }
+
+        /// <summary>Sized from the mount's body capsule and its configured scale, so it fits a
+        /// Neck as well as Eikthyr; the top of the spheres sits just under the seat.</summary>
+        private void PlaceCapeBlocker(Character mount)
+        {
+            var mountTr = mount.transform;
+            var up = mountTr.up;
+            var forward = mountTr.forward;
+            var attach = MountHub.FindAttach(mount.gameObject);
+            var seat = attach != null ? attach.position : mountTr.position + up;
+
+            var profile = MountSettings.Find(mount.gameObject);
+            float scale = profile?.Scale != null ? Mathf.Clamp(profile.Scale.Value, 0.5f, 3f) : 1f;
+            float radius = 0.35f;
+            if (mount.m_collider is CapsuleCollider capsule && capsule != null)
+                radius = capsule.radius * Mathf.Max(Mathf.Abs(mountTr.lossyScale.x), Mathf.Abs(mountTr.lossyScale.z));
+            radius = Mathf.Clamp(radius * scale, 0.2f, 1.2f);
+
+            var spine = seat - up * (radius + 0.06f);
+            _blockFront.transform.position = spine + forward * (radius * 0.5f);
+            _blockBack.transform.position = spine - forward * (radius * 2.4f);
+            _blockFront.radius = radius;
+            _blockBack.radius = radius;
+        }
+
+        private bool HasBlocker(ClothSphereColliderPair[] pairs)
+        {
+            if (pairs == null || _blockFront == null)
+                return false;
+            for (int i = 0; i < pairs.Length; i++)
+            {
+                if (pairs[i].first == _blockFront)
+                    return true;
+            }
+            return false;
+        }
+
+        private ClothState FindClothState(Cloth cloth)
+        {
+            for (int i = 0; i < _cloths.Count; i++)
+            {
+                if (_cloths[i].Cloth == cloth)
+                    return _cloths[i];
+            }
+            return null;
+        }
+
+        private void ReleaseCapeCloth()
+        {
+            for (int i = 0; i < _cloths.Count; i++)
+            {
+                var state = _cloths[i];
+                if (state.Cloth != null && HasBlocker(state.Cloth.sphereColliders))
+                    state.Cloth.sphereColliders = state.Original ?? new ClothSphereColliderPair[0];
+            }
+            _cloths.Clear();
+
+            if (_capeBlocker != null)
+                Destroy(_capeBlocker);
+            _capeBlocker = null;
+            _blockFront = null;
+            _blockBack = null;
+        }
+
         private Transform CapeTransform(Transform transform)
         {
             Transform cape = null;
@@ -169,12 +307,18 @@ namespace ValheimMontarias.Prefabs
                     state.Transform.localPosition = state.BaseLocalPosition;
             }
             _capeTransforms.Clear();
+            ReleaseCapeCloth();
         }
 
         private void OnDisable()
         {
             RestoreLegPose();
             RestoreCape();
+        }
+
+        private void OnDestroy()
+        {
+            ReleaseCapeCloth();
         }
     }
 }

@@ -32,6 +32,9 @@ namespace ValheimMontarias
         public ConfigEntry<float> SaddleXOffset;
         public ConfigEntry<float> SaddleYOffset;
         public ConfigEntry<float> SaddleZOffset;
+        public ConfigEntry<float> SaddleXRotation;
+        public ConfigEntry<float> SaddleYRotation;
+        public ConfigEntry<float> SaddleZRotation;
         public ConfigEntry<string> SaddlePrefab;
         public ConfigEntry<float> LegSpread;
         public ConfigEntry<float> CastSeconds;
@@ -98,6 +101,10 @@ namespace ValheimMontarias
             profile?.SaddleXOffset != null && profile.SaddleYOffset != null && profile.SaddleZOffset != null
                 ? new Vector3(profile.SaddleXOffset.Value, profile.SaddleYOffset.Value, profile.SaddleZOffset.Value)
                 : SaddlePositionOffset;
+        public static Quaternion SaddleRotationFor(MountProfile profile) =>
+            profile?.SaddleXRotation != null && profile.SaddleYRotation != null && profile.SaddleZRotation != null
+                ? Quaternion.Euler(profile.SaddleXRotation.Value, profile.SaddleYRotation.Value, profile.SaddleZRotation.Value)
+                : Quaternion.identity;
         public static float Cast => Javali != null ? Mathf.Max(0.1f, Javali.CastSeconds.Value) : 2f;
 
         public static void Init(BaseUnityPlugin plugin, ConfigSync sync)
@@ -122,9 +129,12 @@ namespace ValheimMontarias
                 "Se ligado, todo mundo tem a habilidade máxima e todas as montarias, sem comprar.");
 
             RidingRankList = Bind(plugin, sync, "Habilidade", "Niveis", RidingRanks.Default,
-                "Níveis da Habilidade de Montaria, em ordem: nome:velocidade separados por |. " +
-                "A velocidade multiplica a da montaria de quem tem o nível (1 = sem bônus). " +
+                "Níveis da Habilidade de Montaria, em ordem: nome:velocidade:cast separados por |. " +
+                "A velocidade multiplica a da montaria de quem tem o nível (1 = sem bônus); " +
+                "o cast multiplica o tempo de conjuração de todas as montarias (1 = sem redução, 0.5 = metade). " +
                 "Quem vende é o Mestre das Montarias (NpcValheim).");
+            if (RidingRankList.Value == RidingRanks.OldDefault)
+                RidingRankList.Value = RidingRanks.Default;
             RidingRankList.SettingChanged += (_, __) => MountHub.ApplySpeedAll();
 
             MenuKey = plugin.Config.Bind("Geral", "TeclaMenu", new KeyboardShortcut(KeyCode.U),
@@ -214,6 +224,12 @@ namespace ValheimMontarias
                 "Deslocamento vertical da sela em unidades do modelo.");
             profile.SaddleZOffset = Bind(plugin, sync, group, "SelaOffsetZ", 0f,
                 "Deslocamento frente/trás da sela em unidades do modelo.");
+            profile.SaddleXRotation = Bind(plugin, sync, group, "SelaRotacaoX", 0f,
+                "Rotação da sela no eixo X (inclina frente/trás), em graus.");
+            profile.SaddleYRotation = Bind(plugin, sync, group, "SelaRotacaoY", 0f,
+                "Rotação da sela no eixo Y (gira sobre as costas da montaria), em graus. Ex.: 90 ou 180.");
+            profile.SaddleZRotation = Bind(plugin, sync, group, "SelaRotacaoZ", 0f,
+                "Rotação da sela no eixo Z (inclina para os lados), em graus.");
             profile.SaddlePrefab = Bind(plugin, sync, group, "PrefabSela", "SaddleLox",
                 "Prefab de item da sela usado na aparência da montaria (ex.: SaddleLox, SaddleAsksvin).");
             profile.LegSpread = Bind(plugin, sync, group, "AberturaPernas", 10f,
@@ -237,6 +253,9 @@ namespace ValheimMontarias
             profile.SaddleXOffset.SettingChanged += (_, __) => profile.ApplyAll();
             profile.SaddleYOffset.SettingChanged += (_, __) => profile.ApplyAll();
             profile.SaddleZOffset.SettingChanged += (_, __) => profile.ApplyAll();
+            profile.SaddleXRotation.SettingChanged += (_, __) => profile.ApplyAll();
+            profile.SaddleYRotation.SettingChanged += (_, __) => profile.ApplyAll();
+            profile.SaddleZRotation.SettingChanged += (_, __) => profile.ApplyAll();
             profile.SaddlePrefab.SettingChanged += (_, __) => profile.ApplyAll();
             profile.Scale.SettingChanged += (_, __) =>
             {

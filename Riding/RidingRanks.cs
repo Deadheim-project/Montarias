@@ -10,6 +10,8 @@ namespace ValheimMontarias
         public int Level;
         public string Name;
         public float Speed;
+        /// <summary>Multiplies every mount's cast time (1 = no change, 0.5 = half).</summary>
+        public float Cast = 1f;
     }
 
     /// <summary>
@@ -20,7 +22,11 @@ namespace ValheimMontarias
     /// </summary>
     internal static class RidingRanks
     {
-        public const string Default = "Montaria Aprendiz:1|Montaria Experiente:1.25|Montaria Mestre:1.5";
+        public const string Default = "Montaria Aprendiz:1:1|Montaria Experiente:1.25:0.75|Montaria Mestre:1.5:0.5";
+
+        /// <summary>The default before levels had a cast time; a config still on it is moved to
+        /// <see cref="Default"/>, one an admin edited is left alone.</summary>
+        public const string OldDefault = "Montaria Aprendiz:1|Montaria Experiente:1.25|Montaria Mestre:1.5";
 
         private static string _parsedFrom;
         private static List<RidingRank> _ranks = new List<RidingRank>();
@@ -64,9 +70,17 @@ namespace ValheimMontarias
             return Get(Mathf.Min(level, Count)).Speed;
         }
 
-        /// <summary>"nome:velocidade" entries separated by |. A level with no name or a speed
-        /// that is not a number is skipped and named in the log; the speed is clamped to
-        /// 0.5..3 so a typo cannot launch a mount across the map.</summary>
+        /// <summary>Cast time multiplier of a level; levels past the list keep the last one's.</summary>
+        public static float CastOf(int level)
+        {
+            if (level <= 0 || Count == 0) return 1f;
+            return Get(Mathf.Min(level, Count)).Cast;
+        }
+
+        /// <summary>"nome:velocidade:cast" entries separated by |, the cast being optional (1).
+        /// A level with no name or a value that is not a number is skipped and named in the
+        /// log; the speed is clamped to 0.5..3 so a typo cannot launch a mount across the map,
+        /// and the cast to 0.1..1 so a level never makes summoning slower.</summary>
         internal static List<RidingRank> Parse(string raw, List<string> problems)
         {
             var ranks = new List<RidingRank>();
@@ -77,14 +91,24 @@ namespace ValheimMontarias
                 var text = entry.Trim();
                 if (text.Length == 0) continue;
 
+                var parts = text.Split(':');
                 string name = text;
                 float speed = 1f;
-                int colon = text.LastIndexOf(':');
-                if (colon >= 0)
+                float cast = 1f;
+                if (parts.Length >= 3 && TryNumber(parts[parts.Length - 2], out _))
                 {
-                    name = text.Substring(0, colon).Trim();
-                    var number = text.Substring(colon + 1).Trim().Replace(',', '.');
-                    if (!float.TryParse(number, NumberStyles.Float, CultureInfo.InvariantCulture, out speed))
+                    name = string.Join(":", parts, 0, parts.Length - 2).Trim();
+                    TryNumber(parts[parts.Length - 2], out speed);
+                    if (!TryNumber(parts[parts.Length - 1], out cast))
+                    {
+                        problems?.Add($"\"{text}\": cast não é um número");
+                        continue;
+                    }
+                }
+                else if (parts.Length >= 2)
+                {
+                    name = string.Join(":", parts, 0, parts.Length - 1).Trim();
+                    if (!TryNumber(parts[parts.Length - 1], out speed))
                     {
                         problems?.Add($"\"{text}\": velocidade não é um número");
                         continue;
@@ -100,10 +124,14 @@ namespace ValheimMontarias
                 {
                     Level = ranks.Count + 1,
                     Name = name,
-                    Speed = Mathf.Clamp(speed, 0.5f, 3f)
+                    Speed = Mathf.Clamp(speed, 0.5f, 3f),
+                    Cast = Mathf.Clamp(cast, 0.1f, 1f)
                 });
             }
             return ranks;
         }
+
+        private static bool TryNumber(string text, out float value) =>
+            float.TryParse(text.Trim().Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out value);
     }
 }

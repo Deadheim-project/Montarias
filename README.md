@@ -14,10 +14,13 @@ Para invocar uma montaria é preciso:
 
 As duas coisas são vendidas pelo NPC **Mestre das Montarias** do NpcValheim (abas
 *Treinamento* e *Montarias*), cada item na moeda que o servidor configurar (Deadcoins ou
-Coins). Os níveis acima do exigido deixam todas as suas montarias mais rápidas.
+Coins). Os níveis acima do exigido deixam todas as suas montarias mais rápidas e encurtam
+a conjuração.
 
-Os níveis ficam em `[Habilidade] Niveis` (`nome:velocidade|...`). O padrão é
-`Montaria Aprendiz:1|Montaria Experiente:1.25|Montaria Mestre:1.5`.
+Os níveis ficam em `[Habilidade] Niveis` (`nome:velocidade:cast|...`; o `cast` multiplica o
+tempo de conjuração e é opcional). O padrão é
+`Montaria Aprendiz:1:1|Montaria Experiente:1.25:0.75|Montaria Mestre:1.5:0.5`. Uma config
+ainda no padrão antigo (sem cast) é atualizada sozinha; uma editada fica como está.
 
 ## Como usar
 
@@ -65,7 +68,8 @@ por reflexão: catálogo (montarias, níveis), o estado do jogador local e, no s
 (`LockConfig = true`):
 
 - `[Montaria<id>]`: `Nome`, `VelocidadeCorrida`, `VelocidadeAndar`, `AlturaPulo`,
-  `Escala`, `PrefabSela`, `AberturaPernas` (graus; `0` desativa), `CastSegundos`,
+  `Escala`, `PrefabSela`, `SelaOffsetX/Y/Z`, `SelaRotacaoX/Y/Z` (graus; `Y` gira a sela
+  sobre as costas), `AberturaPernas` (graus; `0` desativa), `CastSegundos`,
   `HabilidadeMinima`.
 - `[Habilidade]`: `Niveis`.
 - `[Geral]`: `LockConfig`, `LiberarTodasGratis`, `TeclaMenu`, `TeclaInvocar`.

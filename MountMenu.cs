@@ -387,6 +387,8 @@ namespace ValheimMontarias
                 $"Habilidade exigida: {RidingRanks.NameOf(profile.MinRank)}\n" +
                 $"Velocidade: {Value(profile.RunSpeed) * bonus:0.#}" +
                 (bonus > 1.001f ? $" <color=#9a9188>(+{(bonus - 1f) * 100f:0}% da sua habilidade)</color>" : "") + "\n" +
+                $"Conjuração: {Mathf.Max(0.1f, Value(profile.CastSeconds) * MountRoster.CastMultiplier):0.#}s" +
+                (MountRoster.CastMultiplier < 0.999f ? $" <color=#9a9188>(-{(1f - MountRoster.CastMultiplier) * 100f:0}% da sua habilidade)</color>" : "") + "\n" +
                 "Use o item da montaria para montar; E ou o item para descer.",
                 15, ValheimUi.Beige, TextAlignmentOptions.TopLeft);
             ValheimUi.Anchor((RectTransform)stats.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
@@ -490,14 +492,14 @@ namespace ValheimMontarias
                 : rank <= 0
                     ? "Você ainda não sabe montar."
                     : $"<color=#9a9188>Sua habilidade:</color> {RidingRanks.NameOf(rank)} " +
-                      $"<color=#9a9188>(velocidade {RidingRanks.SpeedOf(rank) * 100f:0}%)</color>";
+                      $"<color=#9a9188>(velocidade {RidingRanks.SpeedOf(rank) * 100f:0}%{CastText(RidingRanks.CastOf(rank))})</color>";
 
             foreach (var level in RidingRanks.All)
             {
                 var row = Row(_skillList, 52f);
                 ValheimUi.CreateItemIcon(row, SkillIcon, 36f);
                 var label = ValheimUi.CreateLabel(row,
-                    $"{level.Name}\n<size=12><color=#9a9188>velocidade {level.Speed * 100f:0}%</color></size>",
+                    $"{level.Name}\n<size=12><color=#9a9188>velocidade {level.Speed * 100f:0}%{CastText(level.Cast)}</color></size>",
                     16, ValheimUi.Beige, TextAlignmentOptions.Left);
                 Flexible(label.gameObject);
 
@@ -590,6 +592,7 @@ namespace ValheimMontarias
             AddStat("Pulo", selected.JumpHeight, 3f, 20f);
             AddStat("Escala", selected.Scale, 0.5f, 3f);
             AddStat("Abertura das pernas (graus)", selected.LegSpread, 0f, 45f);
+            AddStat("Rotação da sela (graus)", selected.SaddleYRotation, -360f, 360f);
             AddIntStat("Habilidade exigida (nível)", selected.RequiredRank, 1, Mathf.Max(1, RidingRanks.Count));
 
             var apply = ValheimUi.CreateButton(_adminEditor, "Aplicar stats", 0f, 42f, 15);
@@ -689,6 +692,10 @@ namespace ValheimMontarias
         }
 
         private static float Value(ConfigEntry<float> entry) => entry != null ? entry.Value : 0f;
+
+        /// <summary>", conjuração -25%" for a level that shortens the cast, nothing otherwise.</summary>
+        private static string CastText(float cast) =>
+            cast < 0.999f ? $", conjuração -{(1f - cast) * 100f:0}%" : "";
 
         private static void ClearChildren(RectTransform content)
         {

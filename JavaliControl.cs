@@ -120,6 +120,12 @@ namespace ValheimMontarias.Prefabs
         private static float _castStartedAt;
         private static float _castUntil;
         private static string _castPrefab = BoarPrefab.PrefabName;
+        private static string _castName;
+
+        public static bool IsCasting => _casting;
+
+        /// <summary>The mount being summoned, for the cast bar.</summary>
+        public static string CastName => _castName;
 
         public static float CastProgress
         {
@@ -130,9 +136,6 @@ namespace ValheimMontarias.Prefabs
                 return Mathf.Clamp01((Time.unscaledTime - _castStartedAt) / duration);
             }
         }
-
-        public static float CastDuration =>
-            _casting ? Mathf.Max(0f, _castUntil - _castStartedAt) : 0f;
 
         public static void Tick(Player player)
         {
@@ -246,6 +249,8 @@ namespace ValheimMontarias.Prefabs
 
             _castPrefab = string.IsNullOrEmpty(profile.PrefabName) ? BoarPrefab.PrefabName : profile.PrefabName;
             float cast = profile.CastSeconds != null ? Mathf.Max(0.1f, profile.CastSeconds.Value) : 2f;
+            cast = Mathf.Max(0.1f, cast * MountRoster.CastMultiplier);
+            _castName = profile.Name;
             _casting = true;
             _castStartedAt = Time.unscaledTime;
             _castUntil = Time.unscaledTime + cast;
@@ -647,7 +652,7 @@ namespace ValheimMontarias.Prefabs
         /// </summary>
         public static bool TryOverrideRideControls(Player player)
         {
-            if (!TryGetRidden(player, out var mount, out _, out var controller))
+            if (!TryGetRidden(player, out var mount, out _, out _))
             {
                 _wasRiding = false;
                 return false;
@@ -669,14 +674,10 @@ namespace ValheimMontarias.Prefabs
             MountHub.FitSeat(mount.gameObject);
             MountHub.KeepHumanScale(player);
 
-            if (controller == null)
-                controller = mount.GetComponentInChildren<Sadle>(true);
-
+            // Walking and running are read by the mount's own AI (MountAi_UpdateAI_Patch);
+            // here only the keys that act once.
             if (AdminMenu.IsOpen)
-            {
-                Access.ApplyDoodad(controller, player);
                 return true;
-            }
 
             // E (Use) gets you off, like the mount item and the summon key do. The mount goes with it.
             if (Access.DismountPressed())
@@ -699,11 +700,44 @@ namespace ValheimMontarias.Prefabs
                         body.linearVelocity = vel;
                     }
                 }
-                Access.ApplyDoodad(controller, player);
-                return true;
             }
+            return true;
+        }
 
-            Access.ApplyDoodad(controller, player);
+        /// <summary>
+        /// What the mount's AI does in place of its own while someone rides it: walk or run
+        /// where the rider looks while forward is held, stand still otherwise. Nothing else --
+        /// no wandering, fleeing, following or looking for food, which is what made the
+        /// mounts move by themselves. Covers the Deer too, whose AnimalAI never asks the
+        /// saddle (only MonsterAI does), so it did not move at all.
+        /// </summary>
+        public static bool DriveAI(BaseAI ai)
+        {
+            var nview = ai.m_nview;
+            if (nview == null || !nview.IsValid() || !nview.IsOwner()) return false;
+
+            if (RideIntent(ai.gameObject, out var dir, out bool run))
+                ai.MoveTowards(dir, run);
+            else
+                ai.StopMoving();
+            return true;
+        }
+
+        private static bool RideIntent(GameObject mount, out Vector3 dir, out bool run)
+        {
+            dir = Vector3.zero;
+            run = false;
+            var player = Player.m_localPlayer;
+            if (player == null || player.IsDead() || AdminMenu.IsOpen || !player.TakeInput()) return false;
+            if (!TryGetRidden(player, out var ridden, out _, out _) || ridden == null || ridden.gameObject != mount)
+                return false;
+            if (Access.RideStick().z < 0.5f) return false;
+
+            dir = player.GetLookDir();
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 0.0001f) dir = player.transform.forward;
+            dir.Normalize();
+            run = Access.RunHeld();
             return true;
         }
 

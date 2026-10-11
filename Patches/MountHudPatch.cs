@@ -21,4 +21,28 @@ namespace ValheimMontarias.Patches
             return false;
         }
     }
+
+    /// <summary>
+    /// The summon cast uses the game's own action bar -- the one of "equipping" or "eating" --
+    /// so it looks and sits exactly like Valheim's.
+    /// </summary>
+    [HarmonyPatch(typeof(Hud), "UpdateActionProgress")]
+    internal static class Hud_UpdateActionProgress_Patch
+    {
+        private static bool Prepare() => AccessTools.Method(typeof(Hud), "UpdateActionProgress") != null;
+
+        [HarmonyPostfix]
+        private static void Postfix(Hud __instance)
+        {
+            if (!JavaliControl.IsCasting) return;
+            if (__instance.m_actionBarRoot == null || __instance.m_actionProgress == null) return;
+
+            __instance.m_actionBarRoot.SetActive(true);
+            __instance.m_actionProgress.SetValue(JavaliControl.CastProgress);
+            if (__instance.m_actionName != null)
+                __instance.m_actionName.text = string.IsNullOrEmpty(JavaliControl.CastName)
+                    ? "Invocando montaria"
+                    : $"Invocando {JavaliControl.CastName}";
+        }
+    }
 }

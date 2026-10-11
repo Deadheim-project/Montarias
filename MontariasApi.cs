@@ -46,6 +46,9 @@ namespace ValheimMontarias
 
         public static float RankSpeed(int rank) => RidingRanks.SpeedOf(rank);
 
+        /// <summary>What a level multiplies every cast time by (1 = no change, 0.5 = half).</summary>
+        public static float RankCast(int rank) => RidingRanks.CastOf(rank);
+
         // ---- local player (client) ----
 
         /// <summary>Whether the server has answered yet; until then Rank/Owns read as nothing.</summary>

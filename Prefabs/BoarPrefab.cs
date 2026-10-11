@@ -327,8 +327,27 @@ namespace ValheimMontarias.Prefabs
             var noEffects = new EffectList();
             Access.Set(noEffects, "m_effectPrefabs", Array.Empty<EffectList.EffectData>());
 
+            // The neigh it gave right after being summoned: its idle call (every few seconds
+            // from Start), the boss music and whatever sound plays on its own when it spawns.
+            foreach (var character in mount.GetComponentsInChildren<Character>(true))
+            {
+                character.m_boss = false;
+                character.m_bossEvent = string.Empty;
+                character.m_defeatSetGlobalKey = string.Empty;
+                character.m_jumpEffects = noEffects;
+                if (character is Humanoid humanoid)
+                    humanoid.m_equipEffects = noEffects;
+            }
+
+            foreach (var sfx in mount.GetComponentsInChildren<ZSFX>(true))
+                sfx.m_playOnAwake = false;
+            foreach (var audio in mount.GetComponentsInChildren<AudioSource>(true))
+                audio.playOnAwake = false;
+
             foreach (var ai in mount.GetComponentsInChildren<BaseAI>(true))
             {
+                ai.m_idleSound = noEffects;
+                ai.m_idleSoundChance = 0f;
                 Access.Set(ai, "m_alertedEffects", noEffects);
                 Access.Set(ai, "m_alertedMessage", string.Empty);
                 Access.Set(ai, "m_spawnMessage", string.Empty);

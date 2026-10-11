@@ -133,7 +133,6 @@ namespace ValheimMontarias
 
         private static MethodInfo _getButton;
         private static MethodInfo _getButtonDown;
-        private static MethodInfo _applyControlls;
 
         public static bool IsAdmin()
         {
@@ -246,119 +245,6 @@ namespace ValheimMontarias
             else if (ButtonHeld("Left") || Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow))
                 side = -1f;
             return new Vector3(side, 0f, forward);
-        }
-
-        public static void ApplyDoodad(object controller, Player player)
-        {
-            if (controller == null || player == null) return;
-            Vector3 stick = AdminMenu.IsOpen ? Vector3.zero : RideStick();
-            if (stick.z < 0.5f)
-            {
-                StopMount(controller);
-                return;
-            }
-
-            Vector3 look = player.GetLookDir();
-            look.y = 0f;
-            if (look.sqrMagnitude < 0.0001f)
-                look = player.transform.forward;
-            look.Normalize();
-            bool run = RunHeld();
-
-            if (Get(controller, "m_character") is Character rideCharacter)
-            {
-                var ai = rideCharacter.GetComponent<BaseAI>();
-                if (ai != null)
-                {
-                    ai.StopMoving();
-                    Access.Call(ai, "ResetPatrolPoint");
-                }
-            }
-
-            if (_applyControlls == null)
-            {
-                MethodInfo best = null;
-                foreach (var method in controller.GetType().GetMethods(Any))
-                {
-                    if (method.Name != "ApplyControlls") continue;
-                    if (best == null || method.GetParameters().Length > best.GetParameters().Length)
-                        best = method;
-                }
-                _applyControlls = best;
-            }
-            if (_applyControlls == null) return;
-            var pars = _applyControlls.GetParameters();
-            object[] args;
-            if (pars.Length == 5 && pars[1].ParameterType == typeof(Vector3))
-                args = new object[] { stick, look, run, false, false };
-            else if (pars.Length == 5)
-                args = new object[] { stick, run, false, false, false };
-            else if (pars.Length == 4)
-                args = new object[] { stick, run, false, false };
-            else if (pars.Length == 3)
-                args = new object[] { stick, run, false };
-            else if (pars.Length == 1)
-                args = new object[] { stick };
-            else
-                return;
-            try
-            {
-                _applyControlls.Invoke(controller, args);
-            }
-            catch (Exception e)
-            {
-                Plugin.Log.LogWarning($"ValheimMontarias: ApplyControlls failed: {e.InnerException?.Message ?? e.Message}");
-            }
-
-            if (Get(controller, "m_character") is Character mountCharacter)
-                mountCharacter.SetRun(run);
-        }
-
-        /// <summary>
-        /// Sadle.ApplyControlls sends Speed.NoChange when stick.z is near 0, which leaves
-        /// the last Walk direction running. Stop the AI explicitly when the rider is idle.
-        /// </summary>
-        public static void StopMount(object controller)
-        {
-            if (controller == null) return;
-            Call(controller, "ResetControlls");
-
-            var mountCharacter = Get(controller, "m_character") as Character;
-            foreach (var aiCandidate in new object[]
-            {
-                Get(controller, "m_monsterAI"),
-                Get(controller, "m_ai"),
-                Get(controller, "m_baseAI"),
-                mountCharacter != null ? (Get(mountCharacter, "m_monsterAI") ?? Get(mountCharacter, "m_ai")) : null
-            })
-            {
-                if (aiCandidate == null) continue;
-                if (aiCandidate is Component c)
-                {
-                    Call(c, "StopMoving");
-                    continue;
-                }
-
-                var type = aiCandidate.GetType();
-                if (type.GetMethod("StopMoving", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) != null)
-                    Call(aiCandidate, "StopMoving");
-            }
-
-            if (mountCharacter != null)
-            {
-                mountCharacter.SetRun(false);
-                Set(mountCharacter, "m_moveDir", Vector3.zero);
-                Set(mountCharacter, "m_moveVelocity", Vector3.zero);
-                Set(mountCharacter, "m_speed", 0f);
-                Set(mountCharacter, "m_walkSpeed", 0f);
-                Set(mountCharacter, "m_runSpeed", 0f);
-                var rb = mountCharacter.GetComponent<Rigidbody>();
-                if (rb != null)
-                {
-                    rb.linearVelocity = Vector3.zero;
-                    rb.angularVelocity = Vector3.zero;
-                }
-            }
         }
 
         public static void PlayTrigger(Character character, string trigger)
