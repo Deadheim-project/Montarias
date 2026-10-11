@@ -122,7 +122,9 @@ namespace ValheimMontarias.Prefabs
             float staPct = Mathf.Clamp01(oldSta / oldMaxSta);
             if (staPct > 0.98f)
                 staPct = 1f;
-            Access.Call(sadle, "SetStamina", stamina * staPct);
+            var staminaView = Access.Get(sadle, "m_nview") as ZNetView;
+            if (staminaView != null && staminaView.IsValid() && staminaView.GetZDO() != null)
+                Access.Call(sadle, "SetStamina", stamina * staPct);
         }
 
         public static void ApplyAll(GameObject go)

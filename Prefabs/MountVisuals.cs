@@ -56,8 +56,9 @@ namespace ValheimMontarias.Prefabs
 
             HideVanillaMeshes(go);
             DisableLod(go);
-            // Bind-pose rump, not AABB top (that lands on the head).
-            MountGear.Attach(go, overlay.transform, 0.52f, -0.38f, new Vector3(0.23f, 5.2f, -0.40f), false);
+            // Place the saddle at the torso-top anchor computed from the skin mesh.
+            MountGear.Attach(go, overlay.transform, 0.52f * MountSettings.Size, -0.38f,
+                skin.SeatLocal, false);
         }
 
         public static Transform Overlay(GameObject go)
