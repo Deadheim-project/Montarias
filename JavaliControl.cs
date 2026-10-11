@@ -69,8 +69,6 @@ namespace ValheimMontarias.Prefabs
             }
         }
 
-        protected virtual string DashSfx => "sfx_boar_attack";
-
         public static long OwnerId(GameObject go)
         {
             var nview = go != null ? go.GetComponent<ZNetView>() : null;
@@ -645,7 +643,7 @@ namespace ValheimMontarias.Prefabs
         /// </summary>
         public static bool TryOverrideRideControls(Player player)
         {
-            if (!TryGetRidden(player, out var mount, out var pet, out var controller))
+            if (!TryGetRidden(player, out var mount, out _, out var controller))
             {
                 _wasRiding = false;
                 return false;
@@ -683,20 +681,6 @@ namespace ValheimMontarias.Prefabs
                 return true;
             }
 
-            if (pet.IsDashing)
-            {
-                pet.TickDash(player);
-                return true;
-            }
-
-            if (Access.AttackPressed() || Input.GetMouseButtonDown(0))
-                pet.TryDash(player);
-            if (pet.IsDashing)
-            {
-                pet.TickDash(player);
-                return true;
-            }
-
             if (Access.JumpPressed() || Input.GetKeyDown(KeyCode.Space))
             {
                 if (mount.IsOnGround())
@@ -719,84 +703,6 @@ namespace ValheimMontarias.Prefabs
             return true;
         }
 
-        private const float DashDuration = 0.42f;
-        private const float DashCooldown = 5f;
-        private const float DashSpeed = 21f;
-        private const float DashStamina = 12f;
-        private const float DashDamage = 22f;
-        private const float DashPush = 40f;
-
-        private float _dashUntil;
-        private float _dashReadyAt;
-        private readonly System.Collections.Generic.HashSet<int> _dashHits = new System.Collections.Generic.HashSet<int>();
-
-        public bool IsDashing => Time.time < _dashUntil;
-
-        public void TryDash(Player player)
-        {
-            if (player == null) return;
-            if (Time.time < _dashReadyAt) return;
-            if (!player.HaveStamina(DashStamina))
-            {
-                player.Message(MessageHud.MessageType.Center, "Sem Energia! Descanse um pouco.");
-                return;
-            }
-
-            player.UseStamina(DashStamina);
-            _dashHits.Clear();
-            _dashUntil = Time.time + DashDuration;
-            _dashReadyAt = Time.time + DashCooldown;
-
-            var character = GetComponent<Character>();
-            Access.PlayTrigger(character, "attack");
-            Access.PlaySfx(DashSfx, transform.position);
-            Access.PlaySfx("sfx_unarmed_hit", transform.position);
-        }
-
-        public void TickDash(Player player)
-        {
-            var mount = GetComponent<Character>();
-            var body = Access.Body(mount);
-            Vector3 look = player != null ? player.GetLookDir() : transform.forward;
-            look.y = 0f;
-            if (look.sqrMagnitude < 0.0001f)
-                look = transform.forward;
-            look.Normalize();
-            transform.rotation = Quaternion.LookRotation(look);
-
-            if (body != null)
-            {
-                var vel = look * DashSpeed;
-                vel.y = body.linearVelocity.y;
-                body.linearVelocity = vel;
-            }
-
-            HitDashTargets(mount, look);
-        }
-
-        private void HitDashTargets(Character mount, Vector3 dir)
-        {
-            if (mount == null) return;
-            Vector3 origin = mount.GetCenterPoint() + dir * 0.7f;
-            var hits = Physics.OverlapSphere(origin, 1.35f, -1, QueryTriggerInteraction.Ignore);
-            for (int i = 0; i < hits.Length; i++)
-            {
-                var other = hits[i] != null ? hits[i].GetComponentInParent<Character>() : null;
-                if (other == null || other == mount || other.IsPlayer() || other.IsDead())
-                    continue;
-                int id = other.GetInstanceID();
-                if (!_dashHits.Add(id)) continue;
-
-                var hit = new HitData();
-                hit.m_damage.m_blunt = DashDamage;
-                hit.m_pushForce = DashPush;
-                hit.m_point = other.GetCenterPoint();
-                hit.m_dir = dir;
-                hit.m_hitType = HitData.HitType.EnemyHit;
-                other.Damage(hit);
-            }
-        }
-
         public static string HoverText(GameObject go, Player player)
         {
             if (!IsOwner(go, player))
@@ -805,8 +711,8 @@ namespace ValheimMontarias.Prefabs
                 return "Em combate: não é possível usar a montaria";
             if (Access.IsAdmin())
                 return "[<color=yellow><b>E</b></color>] Ajustes da montaria (admin)\n" +
-                    $"{MountSettings.MenuKeyName()} abre o menu  ·  {MountSettings.SummonKeyName()} monta/desmonta";
-            return $"E, {MountSettings.SummonKeyName()} ou o item da montaria desmontam.\nMontado: Espaço salta, clique investida";
+                    $"{MountSettings.MenuKeyName()} abre o menu";
+            return "E ou o item da montaria desmontam.\nMontado: Espaço salta, Shift corre mais rápido";
         }
     }
 }

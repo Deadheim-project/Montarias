@@ -58,7 +58,7 @@ namespace ValheimMontarias.Prefabs
             DisableLod(go);
             // Place the saddle at the torso-top anchor computed from the skin mesh.
             MountGear.Attach(go, overlay.transform, 0.52f * MountSettings.Size, -0.38f,
-                skin.SeatLocal, false);
+                skin.SeatLocal + MountSettings.SaddlePositionOffset, false);
         }
 
         public static Transform Overlay(GameObject go)

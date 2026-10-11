@@ -6,7 +6,7 @@ namespace ValheimMontarias.Prefabs
     {
         public static bool IsOurs(GameObject go)
         {
-            return BoarPrefab.IsOurs(go);
+            return BoarPrefab.IsOurs(go) || MountSettings.Find(go) != null;
         }
 
         public static void ApplyAll(GameObject go)
@@ -27,7 +27,7 @@ namespace ValheimMontarias.Prefabs
             foreach (var character in Character.GetAllCharacters())
             {
                 if (character != null && BoarPrefab.IsOurs(character.gameObject))
-                    BoarPrefab.ApplyMoveSpeed(character);
+                    BoarPrefab.ApplyMoveSpeed(character, MountSettings.Find(character.gameObject) ?? MountSettings.Javali);
             }
         }
 

@@ -4,8 +4,8 @@ using ValheimMontarias.Prefabs;
 namespace ValheimMontarias.Patches
 {
     /// <summary>
-    /// Vanilla Jump/Attack unseat a saddle. Block that unseat on our boar and
-    /// run jump/dash ourselves. Mounting is still Sadle.Interact (E).
+    /// Vanilla Jump/Attack can unseat a saddle. Keep the rider attached and
+    /// handle jumping ourselves. Mounting is still Sadle.Interact (E).
     /// </summary>
     [HarmonyPatch(typeof(Player), "UpdateDoodadControls")]
     internal static class Player_UpdateDoodadControls_Patch
@@ -68,8 +68,6 @@ namespace ValheimMontarias.Patches
         {
             if (!(__instance is Player player) || player != Player.m_localPlayer) return true;
             if (!JavaliControl.IsRiding(player)) return true;
-            if (JavaliControl.TryGetRidden(player, out _, out var pet, out _))
-                pet.TryDash(player);
             __result = true;
             return false;
         }
@@ -85,8 +83,6 @@ namespace ValheimMontarias.Patches
         {
             if (__instance != Player.m_localPlayer) return true;
             if (!JavaliControl.IsRiding(__instance)) return true;
-            if (JavaliControl.TryGetRidden(__instance, out _, out var pet, out _))
-                pet.TryDash(__instance);
             __result = true;
             return false;
         }

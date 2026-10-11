@@ -1,5 +1,5 @@
 using System;
-using System.Linq;
+using System.Collections.Generic;
 using BepInEx;
 using BepInEx.Configuration;
 using ServerSync;
@@ -25,6 +25,11 @@ namespace ValheimMontarias
         public ConfigEntry<float> JumpHeight;
         public ConfigEntry<float> Scale;
         public ConfigEntry<float> SeatOffset;
+        public ConfigEntry<float> SeatXOffset;
+        public ConfigEntry<float> SeatZOffset;
+        public ConfigEntry<float> SaddleXOffset;
+        public ConfigEntry<float> SaddleYOffset;
+        public ConfigEntry<float> SaddleZOffset;
         public ConfigEntry<float> CastSeconds;
         public ConfigEntry<float> MaxHealth;
         public ConfigEntry<float> MaxStamina;
@@ -71,8 +76,6 @@ namespace ValheimMontarias
         public static ConfigEntry<bool> LockConfig;
         public static ConfigEntry<bool> UnlockAll;
         public static ConfigEntry<KeyboardShortcut> MenuKey;
-        public static ConfigEntry<KeyboardShortcut> SummonKey;
-        public static ConfigEntry<string> SelectedMount;
         public static ConfigEntry<string> RidingRankList;
 
         public static float Run => Javali != null ? Javali.RunSpeed.Value : 12f;
@@ -80,6 +83,12 @@ namespace ValheimMontarias
         public static float Jump => Javali != null ? Javali.JumpHeight.Value : 8.5f;
         public static float Size => Javali != null ? Mathf.Clamp(Javali.Scale.Value, 0.5f, 3f) : 1f;
         public static float SeatHeightOffset => Javali != null ? Mathf.Clamp(Javali.SeatOffset.Value, -2f, 2f) : 0f;
+        public static Vector3 SeatPositionOffset => Javali != null
+            ? new Vector3(Javali.SeatXOffset.Value, 0f, Javali.SeatZOffset.Value)
+            : Vector3.zero;
+        public static Vector3 SaddlePositionOffset => Javali != null
+            ? new Vector3(Javali.SaddleXOffset.Value, Javali.SaddleYOffset.Value, Javali.SaddleZOffset.Value)
+            : Vector3.zero;
         public static float Cast => Javali != null ? Mathf.Max(0.1f, Javali.CastSeconds.Value) : 2f;
         public static float Health => Javali != null ? Mathf.Max(1f, Javali.MaxHealth.Value) : 100f;
         public static float Stamina => Javali != null ? Mathf.Max(1f, Javali.MaxStamina.Value) : 250f;
@@ -87,15 +96,17 @@ namespace ValheimMontarias
 
         public static void Init(BaseUnityPlugin plugin, ConfigSync sync)
         {
-            Javali = new MountProfile("javali", BoarPrefab.DisplayName, BoarPrefab.IsOurs, BoarPrefab.ApplyToAll)
-            {
-                IconFile = "apito_capivara.png",
-                PrefabName = BoarPrefab.PrefabName,
-                ItemPrefab = WhistleItem.PrefabName
-            };
-            BindProfile(plugin, sync, Javali, "Montaria", 12f, 5.5f, 8.5f, 1f, 2f, 100f, 250f, 8f);
+            var profiles = new List<MountProfile>();
+            profiles.Add(CreateProfile("javali", BoarPrefab.DisplayName, BoarPrefab.PrefabName, WhistleItem.PrefabName, "apito_capivara.png"));
+            profiles.Add(CreateProfile("neck", "Neck", "NeckMontaria", "ApitoNeck", "apito_neck.png"));
+            profiles.Add(CreateProfile("deer", "Deer", "DeerMontaria", "ApitoDeer", "apito_deer.png"));
+            profiles.Add(CreateProfile("boar", "Boar", "BoarMontaria", "ApitoBoar", "apito_boar.png"));
+            profiles.Add(CreateProfile("eikthyr", "Eikthyr", "EikthyrMontaria", "ApitoEikthyr", "apito_eikthyr.png"));
+            All = profiles.ToArray();
+            Javali = All.Length > 0 ? All[0] : null;
 
-            All = new[] { Javali };
+            foreach (var profile in All)
+                BindProfile(plugin, sync, profile, "Montaria" + profile.Id, 12f, 5.5f, 8.5f, 1f, 2f, 100f, 250f, 8f);
 
             LockConfig = plugin.Config.Bind("Geral", "LockConfig", true,
                 "Clientes usam a config do servidor.");
@@ -112,31 +123,9 @@ namespace ValheimMontarias
 
             MenuKey = plugin.Config.Bind("Geral", "TeclaMenu", new KeyboardShortcut(KeyCode.U),
                 "Abre o menu de montarias.");
-            SummonKey = plugin.Config.Bind("Geral", "TeclaInvocar", new KeyboardShortcut(KeyCode.I),
-                "Monta na montaria escolhida (já sai montado, como no WoW) ou desmonta.");
-            SelectedMount = plugin.Config.Bind("Geral", "MontariaSelecionada", "javali",
-                "Id da última montaria escolhida no menu.");
-            var keysVersion = plugin.Config.Bind("Geral", "VersaoTeclas", 0,
-                "Uso interno: migração das teclas padrão. Não edite.");
-
-            if (MenuKey.Value.MainKey == KeyCode.H && SummonKey.Value.MainKey == KeyCode.J)
-            {
-                MenuKey.Value = new KeyboardShortcut(KeyCode.U);
-                SummonKey.Value = new KeyboardShortcut(KeyCode.I);
-            }
-            // Montar saiu do H, que e o painel da Arena do NpcValheim, para o I (O e do Guilds). So
-            // uma vez, para nao desfazer quem escolher o H de proposito depois.
-            if (keysVersion.Value < 1)
-            {
-                if (SummonKey.Value.MainKey == KeyCode.H && SummonKey.Value.Modifiers.Count() == 0)
-                    SummonKey.Value = new KeyboardShortcut(KeyCode.I);
-                keysVersion.Value = 1;
-            }
         }
 
         public static string MenuKeyName() => MenuKey != null ? MenuKey.Value.MainKey.ToString() : "U";
-
-        public static string SummonKeyName() => SummonKey != null ? SummonKey.Value.MainKey.ToString() : "I";
 
         public static MountProfile ByItem(string itemPrefab)
         {
@@ -172,6 +161,18 @@ namespace ValheimMontarias
             return null;
         }
 
+        private static MountProfile CreateProfile(string id, string defaultName, string prefabName, string itemPrefab, string iconFile)
+        {
+            MountProfile profile = null;
+            profile = new MountProfile(id, defaultName,
+                go => go != null && go.name.StartsWith(prefabName, StringComparison.Ordinal),
+                () => BoarPrefab.ApplyProfile(profile));
+            profile.IconFile = iconFile;
+            profile.PrefabName = prefabName;
+            profile.ItemPrefab = itemPrefab;
+            return profile;
+        }
+
         private static void BindProfile(
             BaseUnityPlugin plugin, ConfigSync sync, MountProfile profile, string group,
             float run, float walk, float jump, float scale, float cast, float health, float stamina, float drain)
@@ -185,6 +186,16 @@ namespace ValheimMontarias
             profile.Scale = Bind(plugin, sync, group, "Escala", scale, "Escala da montaria (1 = tamanho vanilla).");
             profile.SeatOffset = Bind(plugin, sync, group, "AlturaAssento", 0f,
                 "Ajuste vertical do personagem ao montar (positivo sobe, negativo desce).");
+            profile.SeatXOffset = Bind(plugin, sync, group, "AssentoOffsetX", 0f,
+                "Deslocamento lateral do personagem sobre a montaria, em metros.");
+            profile.SeatZOffset = Bind(plugin, sync, group, "AssentoOffsetZ", 0f,
+                "Deslocamento frente/trás do personagem sobre a montaria, em metros.");
+            profile.SaddleXOffset = Bind(plugin, sync, group, "SelaOffsetX", 0f,
+                "Deslocamento lateral da sela em unidades do modelo.");
+            profile.SaddleYOffset = Bind(plugin, sync, group, "SelaOffsetY", 0f,
+                "Deslocamento vertical da sela em unidades do modelo.");
+            profile.SaddleZOffset = Bind(plugin, sync, group, "SelaOffsetZ", 0f,
+                "Deslocamento frente/trás da sela em unidades do modelo.");
             profile.CastSeconds = Bind(plugin, sync, group, "CastSegundos", cast, "Tempo de conjuração para invocar.");
             profile.MaxHealth = Bind(plugin, sync, group, "Vida", health, "Vida máxima da montaria.");
             profile.MaxStamina = Bind(plugin, sync, group, "Stamina", stamina, "Stamina máxima da montaria.");
@@ -200,6 +211,11 @@ namespace ValheimMontarias
             profile.MaxStamina.SettingChanged += (_, __) => profile.ApplyAll();
             profile.StaminaDrain.SettingChanged += (_, __) => profile.ApplyAll();
             profile.SeatOffset.SettingChanged += (_, __) => profile.ApplyAll();
+            profile.SeatXOffset.SettingChanged += (_, __) => profile.ApplyAll();
+            profile.SeatZOffset.SettingChanged += (_, __) => profile.ApplyAll();
+            profile.SaddleXOffset.SettingChanged += (_, __) => profile.ApplyAll();
+            profile.SaddleYOffset.SettingChanged += (_, __) => profile.ApplyAll();
+            profile.SaddleZOffset.SettingChanged += (_, __) => profile.ApplyAll();
             profile.Scale.SettingChanged += (_, __) =>
             {
                 profile.ApplyAll();

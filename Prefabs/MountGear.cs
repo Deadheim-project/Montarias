@@ -235,7 +235,7 @@ namespace ValheimMontarias.Prefabs
             sit += MountSettings.SeatHeightOffset;
 
             Vector3 world = saddle.position + mount.transform.up * sit;
-            attach.localPosition = mount.transform.InverseTransformPoint(world);
+            attach.localPosition = mount.transform.InverseTransformPoint(world) + MountSettings.SeatPositionOffset;
             attach.localRotation = Quaternion.identity;
         }
 

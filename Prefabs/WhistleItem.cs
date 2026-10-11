@@ -101,9 +101,18 @@ namespace ValheimMontarias.Prefabs
 
         public static void RegisterItem(ObjectDB db)
         {
-            if (db == null) return;
-            ItemPrefab = RegisterOne(db, ItemPrefab, PrefabName, DisplayName, DisplayDesc,
-                "TrophyBoar", "BoarHide", "Club", "Wood");
+            if (db == null || MountSettings.All == null) return;
+            for (int i = 0; i < MountSettings.All.Length; i++)
+            {
+                var profile = MountSettings.All[i];
+                if (profile == null || string.IsNullOrEmpty(profile.ItemPrefab)) continue;
+                var display = profile.Name;
+                var desc = $"Use para montar no {display}; use de novo (ou E) para descer. Requer a Habilidade de Montaria.";
+                var generated = RegisterOne(db, null, profile.ItemPrefab, display, desc,
+                    "TrophyBoar", "BoarHide", "Club", "Wood");
+                if (i == 0)
+                    ItemPrefab = generated;
+            }
         }
 
         private static GameObject RegisterOne(ObjectDB db, GameObject cached, string prefabName, string displayName, string desc, params string[] templates)
@@ -173,6 +182,14 @@ namespace ValheimMontarias.Prefabs
             shared.m_value = 0;
             Access.Set(shared, "m_useItemStands", false);
             Access.Set(shared, "m_questItem", false);
+
+            var profile = MountSettings.ByItem(prefab != null ? prefab.name : null);
+            if (profile != null && !string.IsNullOrEmpty(profile.IconFile))
+            {
+                var sprite = MountMenu.LoadSprite(profile.IconFile);
+                if (sprite != null)
+                    shared.m_icons = new[] { sprite };
+            }
         }
     }
 }
