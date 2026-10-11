@@ -20,6 +20,20 @@ namespace ValheimMontarias.Patches
             }
         }
 
+        /// <summary>GameCamera locks the cursor to the camera every frame unless Menu.IsActive
+        /// says a menu is up; IsVisible alone only shows it. Without this the camera re-locked
+        /// it each frame and the menu freed it again, snapping it back to the middle of the
+        /// screen: a cursor that could not be moved (same fix as NpcValheim's).</summary>
+        [HarmonyPatch(typeof(Menu), nameof(Menu.IsActive))]
+        internal static class Menu_IsActive_Patch
+        {
+            [HarmonyPostfix]
+            private static void Postfix(ref bool __result)
+            {
+                if (MenuOpen) __result = true;
+            }
+        }
+
         [HarmonyPatch(typeof(PlayerController), nameof(PlayerController.TakeInput))]
         internal static class PlayerController_TakeInput_Patch
         {

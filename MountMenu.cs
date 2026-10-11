@@ -143,13 +143,16 @@ namespace ValheimMontarias
         private void LateUpdate()
         {
             if (!_open) return;
-            if (Cursor.lockState != CursorLockMode.None) Cursor.lockState = CursorLockMode.None;
+            // Through ZCursor, the game's own wrapper, so its idea of the cursor stays true.
+            if (ZCursor.LockState != CursorLockMode.None) ZCursor.LockState = CursorLockMode.None;
+            if (!ZCursor.IsVisible) ZCursor.Show();
             if (!Cursor.visible) Cursor.visible = true;
         }
 
         private void OpenInternal(Tab tab, MountProfile adminProfile = null)
         {
-            if (Player.m_localPlayer == null || BusyElsewhere()) return;
+            // Only when opening: once open, Menu.IsVisible answers yes for this very window.
+            if (Player.m_localPlayer == null || (!_open && BusyElsewhere())) return;
             if (tab == Tab.Admin && !Access.IsAdmin())
             {
                 Player.m_localPlayer.Message(MessageHud.MessageType.Center, "Apenas administradores.");
@@ -197,9 +200,9 @@ namespace ValheimMontarias
             if (_canvas != null) Destroy(_canvas);
             _canvas = null;
 
-            if (InventoryGui.instance != null && InventoryGui.IsVisible()) return;
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            if (AdminMenu.IsOpen || Menu.IsVisible() || (InventoryGui.instance != null && InventoryGui.IsVisible())) return;
+            ZCursor.LockState = CursorLockMode.Locked;
+            ZCursor.Hide();
         }
 
         // ---- the window (NpcValheim's NpcWindow, measure for measure) ----
