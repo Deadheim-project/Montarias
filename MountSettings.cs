@@ -15,6 +15,7 @@ namespace ValheimMontarias
         public readonly Func<GameObject, bool> IsInstance;
         public readonly Action ApplyAll;
         public string IconFile;
+        public string VisualAsset;
         public string PrefabName;
         /// <summary>The mount item (its whistle): using it mounts and dismounts.</summary>
         public string ItemPrefab;
@@ -35,6 +36,7 @@ namespace ValheimMontarias
         public ConfigEntry<float> MaxStamina;
         public ConfigEntry<float> StaminaDrain;
         public ConfigEntry<int> RequiredRank;
+        public ConfigEntry<string> AllowedSteamIds;
 
         public MountProfile(string id, string defaultName, Func<GameObject, bool> isInstance, Action applyAll)
         {
@@ -97,7 +99,7 @@ namespace ValheimMontarias
         public static void Init(BaseUnityPlugin plugin, ConfigSync sync)
         {
             var profiles = new List<MountProfile>();
-            profiles.Add(CreateProfile("javali", BoarPrefab.DisplayName, BoarPrefab.PrefabName, WhistleItem.PrefabName, "apito_capivara.png"));
+            profiles.Add(CreateProfile("capivara", "Capivara", "CapivaraMontaria", "ApitoCapivara", "apito_capivara.png"));
             profiles.Add(CreateProfile("neck", "Neck", "NeckMontaria", "ApitoNeck", "apito_neck.png"));
             profiles.Add(CreateProfile("deer", "Deer", "DeerMontaria", "ApitoDeer", "apito_deer.png"));
             profiles.Add(CreateProfile("boar", "Boar", "BoarMontaria", "ApitoBoar", "apito_boar.png"));
@@ -168,6 +170,17 @@ namespace ValheimMontarias
                 go => go != null && go.name.StartsWith(prefabName, StringComparison.Ordinal),
                 () => BoarPrefab.ApplyProfile(profile));
             profile.IconFile = iconFile;
+            profile.VisualAsset = string.IsNullOrEmpty(id)
+                ? "capybara"
+                : id switch
+                {
+                    "capivara" => "capybara",
+                    "neck" => "neck",
+                    "deer" => "deer",
+                    "boar" => "boar",
+                    "eikthyr" => "eikthyr",
+                    _ => "capybara"
+                };
             profile.PrefabName = prefabName;
             profile.ItemPrefab = itemPrefab;
             return profile;
@@ -202,6 +215,11 @@ namespace ValheimMontarias
             profile.StaminaDrain = Bind(plugin, sync, group, "DrenoStamina", drain, "Stamina gasta por segundo ao correr.");
             profile.RequiredRank = Bind(plugin, sync, group, "HabilidadeMinima", 1,
                 "Nível da Habilidade de Montaria exigido para invocar (1 = o primeiro nível).");
+            if (profile.Id == "capivara")
+            {
+                profile.AllowedSteamIds = Bind(plugin, sync, group, "SteamIdsLiberados", "",
+                    "Lista de SteamIDs permitidos para esta montaria. Separe por vírgula. Vazio = qualquer um.");
+            }
 
             profile.CustomName.SettingChanged += (_, __) => profile.ApplyAll();
             profile.RunSpeed.SettingChanged += (_, __) => profile.ApplyAll();

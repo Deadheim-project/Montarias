@@ -15,6 +15,11 @@ namespace ValheimMontarias.Prefabs
 
         public static void Apply(GameObject go)
         {
+            Apply(go, MountSettings.Find(go) ?? MountSettings.Javali);
+        }
+
+        public static void Apply(GameObject go, MountProfile profile)
+        {
             if (go == null) return;
             MountGear.RescueAttach(go);
             var parent = FindVisual(go) ?? go.transform;
@@ -22,13 +27,13 @@ namespace ValheimMontarias.Prefabs
             if (existing != null)
                 UnityEngine.Object.DestroyImmediate(existing.gameObject);
 
-            var skin = Skin();
+            var skin = Skin(profile);
             if (skin == null || skin.Mesh == null)
             {
                 if (!_loggedMissing)
                 {
                     _loggedMissing = true;
-                    Plugin.Log.LogWarning("ValheimMontarias: capybara.skin not found, keeping vanilla boar mesh");
+                    Plugin.Log.LogWarning($"ValheimMontarias: {ResolveAsset(profile)}.skin not found, keeping vanilla boar mesh");
                 }
                 return;
             }
@@ -46,7 +51,7 @@ namespace ValheimMontarias.Prefabs
             renderer.rootBone = RootBone(bones, skin);
             renderer.quality = SkinQuality.Bone4;
             renderer.updateWhenOffscreen = true;
-            renderer.sharedMaterial = MakeMaterial();
+            renderer.sharedMaterial = MakeMaterial(profile);
             renderer.shadowCastingMode = ShadowCastingMode.On;
             if (skin.Mesh != null)
                 renderer.localBounds = skin.Mesh.bounds;
@@ -144,7 +149,7 @@ namespace ValheimMontarias.Prefabs
             return go.transform.Find("Visual");
         }
 
-        private static Material MakeMaterial()
+        private static Material MakeMaterial(MountProfile profile)
         {
             Shader shader = null;
             foreach (var name in new[]
@@ -172,7 +177,7 @@ namespace ValheimMontarias.Prefabs
             if (mat.HasProperty("_MainTex_ST"))
                 mat.SetVector("_MainTex_ST", new Vector4(1f, 1f, 0f, 0f));
 
-            var albedo = Albedo();
+            var albedo = Albedo(profile);
             if (albedo != null)
             {
                 mat.mainTexture = albedo;
@@ -182,28 +187,43 @@ namespace ValheimMontarias.Prefabs
             return mat;
         }
 
-        private static CapybaraSkin Skin()
+        private static CapybaraSkin Skin(MountProfile profile)
         {
-            if (_skin != null) return _skin;
-            var path = AssetPath("capybara.skin");
-            if (!File.Exists(path)) return null;
-            _skin = CapybaraSkin.Load(File.ReadAllBytes(path));
-            return _skin;
+            var assetName = ResolveAsset(profile);
+            if (_skin != null && string.Equals(assetName, "capybara", System.StringComparison.OrdinalIgnoreCase)) return _skin;
+            var path = AssetPath(assetName + ".skin");
+            if (!File.Exists(path))
+            {
+                if (assetName != "capybara")
+                    return Skin(null);
+                return null;
+            }
+            var skin = CapybaraSkin.Load(File.ReadAllBytes(path));
+            if (assetName == "capybara")
+                _skin = skin;
+            return skin;
         }
 
-        private static Texture2D Albedo()
+        private static Texture2D Albedo(MountProfile profile)
         {
-            if (_albedo != null) return _albedo;
-            var path = AssetPath("capybara.png");
-            if (!File.Exists(path)) return null;
+            var assetName = ResolveAsset(profile);
+            if (_albedo != null && string.Equals(assetName, "capybara", System.StringComparison.OrdinalIgnoreCase)) return _albedo;
+            var path = AssetPath(assetName + ".png");
+            if (!File.Exists(path))
+            {
+                if (assetName != "capybara")
+                    return Albedo(null);
+                return null;
+            }
             var bytes = File.ReadAllBytes(path);
             var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
             if (!TryLoadImage(tex, bytes))
                 return null;
             tex.wrapMode = TextureWrapMode.Clamp;
             tex.filterMode = FilterMode.Bilinear;
-            _albedo = tex;
-            return _albedo;
+            if (assetName == "capybara")
+                _albedo = tex;
+            return tex;
         }
 
         private static bool TryLoadImage(Texture2D tex, byte[] bytes)
@@ -220,6 +240,19 @@ namespace ValheimMontarias.Prefabs
                 Plugin.Log.LogWarning($"ValheimMontarias: LoadImage failed: {e.Message}");
                 return false;
             }
+        }
+
+        private static string ResolveAsset(MountProfile profile)
+        {
+            if (profile != null && !string.IsNullOrWhiteSpace(profile.VisualAsset))
+            {
+                var candidate = profile.VisualAsset.Trim();
+                if (File.Exists(Path.Combine(Paths.PluginPath, "ValheimMontarias", "Assets", candidate + ".skin")))
+                    return candidate;
+                if (File.Exists(Path.Combine(Paths.PluginPath, "ValheimMontarias", "Assets", candidate + ".png")))
+                    return candidate;
+            }
+            return "capybara";
         }
 
         private static string AssetPath(string fileName)

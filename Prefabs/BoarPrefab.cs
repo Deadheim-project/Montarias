@@ -56,8 +56,10 @@ namespace ValheimMontarias.Prefabs
         /// has to exist; the prefab and everyone else's mounts stay at the configured speed.</summary>
         private static float RiderBonus(Character character)
         {
+            if (character == null) return 1f;
             var go = character.gameObject;
-            if (Prefab == null || go == Prefab) return 1f;
+            var profile = MountSettings.Find(go);
+            if (profile == null) return 1f;
             var player = Player.m_localPlayer;
             if (player == null) return 1f;
             long owner = JavaliControl.OwnerId(go);
@@ -243,9 +245,21 @@ namespace ValheimMontarias.Prefabs
 
         public static void ApplyToAll()
         {
-            ApplyMoveSpeed(Prefab != null ? Prefab.GetComponent<Character>() : null);
-            ApplyScale(Prefab);
-            ApplyStats(Prefab);
+            if (MountSettings.All != null)
+            {
+                for (int i = 0; i < MountSettings.All.Length; i++)
+                {
+                    var profile = MountSettings.All[i];
+                    if (profile != null)
+                        ApplyProfile(profile);
+                }
+            }
+            if (Prefab != null)
+            {
+                ApplyMoveSpeed(Prefab.GetComponent<Character>(), MountSettings.Find(Prefab) ?? MountSettings.Javali);
+                ApplyScale(Prefab, MountSettings.Find(Prefab) ?? MountSettings.Javali);
+                ApplyStats(Prefab, MountSettings.Find(Prefab) ?? MountSettings.Javali);
+            }
             foreach (var character in Character.GetAllCharacters())
             {
                 if (character == null || !IsOurs(character.gameObject)) continue;
@@ -299,14 +313,14 @@ namespace ValheimMontarias.Prefabs
                 return;
             }
 
-            var boar = FindPrefab(scene, "Boar");
-            if (boar == null)
+            var template = FindTemplate(scene, profile);
+            if (template == null)
             {
-                Plugin.Log.LogError("ValheimMontarias: vanilla Boar prefab not found");
+                Plugin.Log.LogError($"ValheimMontarias: no vanilla template found for {profile.Name}");
                 return;
             }
 
-            var clone = UnityEngine.Object.Instantiate(boar, Hidden);
+            var clone = UnityEngine.Object.Instantiate(template, Hidden);
             clone.name = profile.PrefabName;
 
             var nview = clone.GetComponent<ZNetView>();
@@ -354,6 +368,36 @@ namespace ValheimMontarias.Prefabs
                 if (prefab != null)
                     Access.EnsureNamedPrefab(scene, prefab);
             }
+        }
+
+        private static GameObject FindTemplate(ZNetScene scene, MountProfile profile)
+        {
+            if (scene == null || profile == null) return null;
+            var names = new[]
+            {
+                profile.Id,
+                profile.Id switch
+                {
+                    "capivara" => "Boar",
+                    "neck" => "Neck",
+                    "deer" => "Deer",
+                    "boar" => "Boar",
+                    "eikthyr" => "Eikthyr",
+                    _ => "Boar"
+                },
+                "Boar",
+                "Deer",
+                "Neck",
+                "Eikthyr",
+                "Lox"
+            };
+            for (int i = 0; i < names.Length; i++)
+            {
+                var template = FindPrefab(scene, names[i]);
+                if (template != null)
+                    return template;
+            }
+            return null;
         }
 
         private static void AttachSaddle(ZNetScene scene, GameObject boar, Tameable tame, Character character)

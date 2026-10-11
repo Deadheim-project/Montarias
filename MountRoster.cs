@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System;
 
 namespace ValheimMontarias
 {
@@ -21,11 +22,37 @@ namespace ValheimMontarias
         public static float SpeedBonus => RidingRanks.SpeedOf(Rank);
 
         public static bool Owns(MountProfile profile) =>
-            profile != null && (UnlockAll || RiderClient.Owns(profile.Id));
+            profile != null && AllowedForLocalPlayer(profile) && (UnlockAll || RiderClient.Owns(profile.Id));
 
         public static bool CanRide(MountProfile profile) => profile != null && Rank >= profile.MinRank;
 
         public static bool Usable(MountProfile profile) => Owns(profile) && CanRide(profile);
+
+        public static bool AllowedForLocalPlayer(MountProfile profile)
+        {
+            if (profile == null)
+                return false;
+
+            if (profile.AllowedSteamIds == null || string.IsNullOrWhiteSpace(profile.AllowedSteamIds.Value))
+                return true;
+
+            var allow = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var value in (profile.AllowedSteamIds.Value ?? string.Empty).Split(','))
+            {
+                var item = NormalizeSteamId(value);
+                if (!string.IsNullOrWhiteSpace(item))
+                    allow.Add(item);
+            }
+
+            if (allow.Count == 0)
+                return true;
+
+            foreach (var item in LocalSteamIds())
+                if (allow.Contains(item))
+                    return true;
+
+            return false;
+        }
 
         public static List<MountProfile> UsableMounts()
         {
@@ -44,11 +71,41 @@ namespace ValheimMontarias
         public static string Blocker(MountProfile profile)
         {
             if (profile == null) return "Você ainda não possui nenhuma montaria. Procure o Mestre das Montarias.";
+            if (!AllowedForLocalPlayer(profile))
+                return $"{profile.Name} está disponível apenas para SteamIDs autorizados.";
             if (!Known) return "Consultando o servidor, tente de novo em instantes.";
             if (!Owns(profile)) return $"Você não possui {profile.Name}. Procure o Mestre das Montarias.";
             if (!CanRide(profile))
                 return $"{profile.Name} exige a habilidade {RidingRanks.NameOf(profile.MinRank)}. Aprenda com o Mestre das Montarias.";
             return null;
+        }
+
+        private static HashSet<string> LocalSteamIds()
+        {
+            var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var player = Player.m_localPlayer;
+            if (player == null)
+                return ids;
+
+            var raw = player.GetPlayerID().ToString();
+            ids.Add(raw);
+            ids.Add("Steam_" + raw);
+            ids.Add("steam_" + raw);
+            return ids;
+        }
+
+        private static string NormalizeSteamId(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            var trimmed = value.Trim();
+            if (trimmed.StartsWith("Steam_", StringComparison.OrdinalIgnoreCase))
+                return trimmed;
+            if (trimmed.StartsWith("steam_", StringComparison.OrdinalIgnoreCase))
+                return "Steam_" + trimmed.Substring(6);
+
+            return trimmed;
         }
     }
 }
