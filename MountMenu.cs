@@ -340,7 +340,7 @@ namespace ValheimMontarias
                 var image = icon.gameObject.AddComponent<Image>();
                 image.preserveAspect = true;
                 image.raycastTarget = false;
-                image.sprite = IconOf(profile.IconFile);
+                image.sprite = IconOf(profile);
                 image.enabled = image.sprite != null;
                 if (!MountRoster.Usable(profile)) image.color = new Color(0.55f, 0.55f, 0.55f, 1f);
 
@@ -369,7 +369,7 @@ namespace ValheimMontarias
             var image = art.gameObject.AddComponent<Image>();
             image.preserveAspect = true;
             image.raycastTarget = false;
-            image.sprite = IconOf(profile.IconFile);
+            image.sprite = IconOf(profile);
             image.enabled = image.sprite != null;
 
             var name = ValheimUi.CreateLabel(_journalDetail, profile.Name, 26, ValheimUi.Orange,
@@ -708,13 +708,16 @@ namespace ValheimMontarias
             if (_status != null) _status.text = text ?? "";
         }
 
-        private Sprite IconOf(string fileName)
+        private Sprite IconOf(MountProfile profile)
         {
-            if (string.IsNullOrEmpty(fileName)) return null;
-            if (_icons.TryGetValue(fileName, out var cached) && cached != null)
+            if (profile == null) return null;
+            string key = profile.Id;
+            if (_icons.TryGetValue(key, out var cached) && cached != null)
                 return cached;
-            var sprite = LoadSprite(fileName);
-            _icons[fileName] = sprite;
+            var sprite = !string.IsNullOrEmpty(profile.IconFile) ? LoadSprite(profile.IconFile) : null;
+            if (sprite == null)
+                sprite = Prefabs.WhistleItem.IconFor(profile);
+            _icons[key] = sprite;
             return sprite;
         }
 

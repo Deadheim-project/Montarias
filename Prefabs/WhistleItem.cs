@@ -108,11 +108,21 @@ namespace ValheimMontarias.Prefabs
                 if (profile == null || string.IsNullOrEmpty(profile.ItemPrefab)) continue;
                 var display = profile.Name;
                 var desc = $"Use para montar no {display}; use de novo (ou E) para descer. Requer a Habilidade de Montaria.";
-                var generated = RegisterOne(db, null, profile.ItemPrefab, display, desc,
-                    "TrophyBoar", "BoarHide", "Club", "Wood");
+                var templates = new[] { profile.IconPrefab, "TrophyBoar", "BoarHide", "Club", "Wood" };
+                var generated = RegisterOne(db, null, profile.ItemPrefab, display, desc, templates);
                 if (i == 0)
                     ItemPrefab = generated;
             }
+        }
+
+        public static Sprite IconFor(MountProfile profile)
+        {
+            if (profile == null || string.IsNullOrEmpty(profile.IconPrefab) || ObjectDB.instance == null)
+                return null;
+
+            var prefab = ObjectDB.instance.GetItemPrefab(profile.IconPrefab);
+            var shared = prefab != null ? prefab.GetComponent<ItemDrop>()?.m_itemData?.m_shared : null;
+            return shared?.m_icons != null && shared.m_icons.Length > 0 ? shared.m_icons[0] : null;
         }
 
         private static GameObject RegisterOne(ObjectDB db, GameObject cached, string prefabName, string displayName, string desc, params string[] templates)

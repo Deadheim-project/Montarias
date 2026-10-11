@@ -15,6 +15,7 @@ namespace ValheimMontarias
         public readonly Func<GameObject, bool> IsInstance;
         public readonly Action ApplyAll;
         public string IconFile;
+        public string IconPrefab;
         public string VisualAsset;
         public string PrefabName;
         /// <summary>The mount item (its whistle): using it mounts and dismounts.</summary>
@@ -99,11 +100,11 @@ namespace ValheimMontarias
         public static void Init(BaseUnityPlugin plugin, ConfigSync sync)
         {
             var profiles = new List<MountProfile>();
-            profiles.Add(CreateProfile("capivara", "Capivara", "CapivaraMontaria", "ApitoCapivara", "apito_capivara.png"));
-            profiles.Add(CreateProfile("neck", "Neck", "NeckMontaria", "ApitoNeck", "apito_neck.png"));
-            profiles.Add(CreateProfile("deer", "Deer", "DeerMontaria", "ApitoDeer", "apito_deer.png"));
-            profiles.Add(CreateProfile("boar", "Boar", "BoarMontaria", "ApitoBoar", "apito_boar.png"));
-            profiles.Add(CreateProfile("eikthyr", "Eikthyr", "EikthyrMontaria", "ApitoEikthyr", "apito_eikthyr.png"));
+            profiles.Add(CreateProfile("capivara", "Capivara", "CapivaraMontaria", "ApitoCapivara", "apito_capivara.png", "TrophyBoar"));
+            profiles.Add(CreateProfile("neck", "Neck", "NeckMontaria", "ApitoNeck", null, "TrophyNeck"));
+            profiles.Add(CreateProfile("deer", "Deer", "DeerMontaria", "ApitoDeer", null, "TrophyDeer"));
+            profiles.Add(CreateProfile("boar", "Boar", "BoarMontaria", "ApitoBoar", null, "TrophyBoar"));
+            profiles.Add(CreateProfile("eikthyr", "Eikthyr", "EikthyrMontaria", "ApitoEikthyr", null, "TrophyEikthyr"));
             All = profiles.ToArray();
             Javali = All.Length > 0 ? All[0] : null;
 
@@ -163,13 +164,14 @@ namespace ValheimMontarias
             return null;
         }
 
-        private static MountProfile CreateProfile(string id, string defaultName, string prefabName, string itemPrefab, string iconFile)
+        private static MountProfile CreateProfile(string id, string defaultName, string prefabName, string itemPrefab, string iconFile, string iconPrefab)
         {
             MountProfile profile = null;
             profile = new MountProfile(id, defaultName,
                 go => go != null && go.name.StartsWith(prefabName, StringComparison.Ordinal),
                 () => BoarPrefab.ApplyProfile(profile));
             profile.IconFile = iconFile;
+            profile.IconPrefab = iconPrefab;
             profile.VisualAsset = string.IsNullOrEmpty(id)
                 ? "capybara"
                 : id switch
