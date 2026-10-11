@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.Rendering;
+using System.Collections.Generic;
 
 namespace ValheimMontarias.Prefabs
 {
@@ -12,10 +13,18 @@ namespace ValheimMontarias.Prefabs
     {
         public const string VisualName = "MountSaddleVisual";
 
+        private sealed class SaddleVisual
+        {
+            public Mesh Mesh;
+            public Material Material;
+            public Quaternion Rotation;
+        }
+
         private static Mesh _saddleMesh;
         private static Mesh _centeredMesh;
         private static Material _saddleMat;
         private static Quaternion _saddleRot = Quaternion.identity;
+        private static readonly Dictionary<string, SaddleVisual> _configuredVisuals = new Dictionary<string, SaddleVisual>();
 
         public static void Capture(GameObject source)
         {
@@ -188,8 +197,10 @@ namespace ValheimMontarias.Prefabs
             var saddle = new GameObject(VisualName);
             saddle.transform.SetParent(overlay, false);
             saddle.transform.localPosition = overlayLocal;
-            saddle.transform.localRotation = (useCapturedRotation && _centeredMesh != null)
-                ? _saddleRot
+            var configured = ConfiguredVisual(MountSettings.Find(mount));
+            Mesh mesh = configured?.Mesh ?? VisualMesh();
+            saddle.transform.localRotation = useCapturedRotation
+                ? configured?.Rotation ?? _saddleRot
                 : Quaternion.identity;
 
             Vector3 parentScale = overlay.lossyScale;
@@ -197,11 +208,10 @@ namespace ValheimMontarias.Prefabs
             float sy = Mathf.Max(0.01f, Mathf.Abs(parentScale.y));
             float sz = Mathf.Max(0.01f, Mathf.Abs(parentScale.z));
 
-            Mesh mesh = VisualMesh();
             var b = mesh.bounds;
             float have = Mathf.Max(0.01f, Mathf.Max(b.size.x, b.size.z));
             float uniform = saddleLength / (have * sx);
-            if (_centeredMesh != null)
+            if (configured != null || _centeredMesh != null)
                 saddle.transform.localScale = Vector3.one * uniform;
             else
                 saddle.transform.localScale = new Vector3(
@@ -212,11 +222,65 @@ namespace ValheimMontarias.Prefabs
             var filter = saddle.AddComponent<MeshFilter>();
             filter.sharedMesh = mesh;
             var renderer = saddle.AddComponent<MeshRenderer>();
-            renderer.sharedMaterial = _saddleMat != null ? _saddleMat : FallbackMat();
+            renderer.sharedMaterial = configured?.Material ?? (_saddleMat != null ? _saddleMat : FallbackMat());
             renderer.shadowCastingMode = ShadowCastingMode.On;
 
             saddle.AddComponent<MountSaddleAnchor>().SitHeight = sitHeight;
             Fit(mount);
+        }
+
+        private static SaddleVisual ConfiguredVisual(MountProfile profile)
+        {
+            string prefabName = profile?.SaddlePrefab?.Value?.Trim();
+            if (string.IsNullOrEmpty(prefabName)) return null;
+            if (_configuredVisuals.TryGetValue(prefabName, out var cached))
+                return cached;
+
+            var source = ObjectDB.instance != null ? ObjectDB.instance.GetItemPrefab(prefabName) : null;
+            if (source == null)
+            {
+                Plugin.Log?.LogWarning($"ValheimMontarias: saddle prefab '{prefabName}' not found; using default saddle");
+                _configuredVisuals[prefabName] = null;
+                return null;
+            }
+
+            Mesh mesh = null;
+            Material material = null;
+            Quaternion rotation = Quaternion.identity;
+            int bestVertexCount = 0;
+            foreach (var filter in source.GetComponentsInChildren<MeshFilter>(true))
+            {
+                var candidate = filter.sharedMesh;
+                if (candidate == null || candidate.vertexCount <= bestVertexCount) continue;
+                bestVertexCount = candidate.vertexCount;
+                mesh = candidate;
+                var renderer = filter.GetComponent<Renderer>();
+                if (renderer != null)
+                {
+                    material = renderer.sharedMaterial;
+                    rotation = renderer.transform.localRotation;
+                }
+            }
+            foreach (var skin in source.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                var candidate = skin.sharedMesh;
+                if (candidate == null || candidate.vertexCount <= bestVertexCount) continue;
+                bestVertexCount = candidate.vertexCount;
+                mesh = candidate;
+                material = skin.sharedMaterial;
+                rotation = skin.transform.localRotation;
+            }
+
+            if (mesh == null)
+            {
+                Plugin.Log?.LogWarning($"ValheimMontarias: saddle prefab '{prefabName}' has no mesh; using default saddle");
+                _configuredVisuals[prefabName] = null;
+                return null;
+            }
+
+            var visual = new SaddleVisual { Mesh = CenterMesh(mesh), Material = material, Rotation = rotation };
+            _configuredVisuals[prefabName] = visual;
+            return visual;
         }
 
         public static void Fit(GameObject mount)

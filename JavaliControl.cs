@@ -16,6 +16,7 @@ namespace ValheimMontarias.Prefabs
         protected virtual void Start()
         {
             InitPet();
+            BoarPrefab.ApplyInfiniteStamina(gameObject);
             BoarPrefab.ApplyAll(gameObject);
         }
 
@@ -129,6 +130,9 @@ namespace ValheimMontarias.Prefabs
                 return Mathf.Clamp01((Time.unscaledTime - _castStartedAt) / duration);
             }
         }
+
+        public static float CastDuration =>
+            _casting ? Mathf.Max(0f, _castUntil - _castStartedAt) : 0f;
 
         public static void Tick(Player player)
         {

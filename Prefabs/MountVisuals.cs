@@ -33,7 +33,7 @@ namespace ValheimMontarias.Prefabs
                 if (!_loggedMissing)
                 {
                     _loggedMissing = true;
-                    Plugin.Log.LogWarning($"ValheimMontarias: {ResolveAsset(profile)}.skin not found, keeping vanilla boar mesh");
+                    Plugin.Log.LogWarning($"ValheimMontarias: {ResolveAsset(profile)}.skin not found, keeping the vanilla mount mesh");
                 }
                 return;
             }
@@ -193,11 +193,7 @@ namespace ValheimMontarias.Prefabs
             if (_skin != null && string.Equals(assetName, "capybara", System.StringComparison.OrdinalIgnoreCase)) return _skin;
             var path = AssetPath(assetName + ".skin");
             if (!File.Exists(path))
-            {
-                if (assetName != "capybara")
-                    return Skin(null);
                 return null;
-            }
             var skin = CapybaraSkin.Load(File.ReadAllBytes(path));
             if (assetName == "capybara")
                 _skin = skin;
@@ -210,11 +206,7 @@ namespace ValheimMontarias.Prefabs
             if (_albedo != null && string.Equals(assetName, "capybara", System.StringComparison.OrdinalIgnoreCase)) return _albedo;
             var path = AssetPath(assetName + ".png");
             if (!File.Exists(path))
-            {
-                if (assetName != "capybara")
-                    return Albedo(null);
                 return null;
-            }
             var bytes = File.ReadAllBytes(path);
             var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
             if (!TryLoadImage(tex, bytes))

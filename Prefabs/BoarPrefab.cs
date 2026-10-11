@@ -11,6 +11,7 @@ namespace ValheimMontarias.Prefabs
     {
         public const string PrefabName = "JavaliMontaria";
         public const string DisplayName = "Capivara";
+        private const float InfiniteStamina = 1000000f;
 
         internal static GameObject Prefab { get; private set; }
 
@@ -100,66 +101,26 @@ namespace ValheimMontarias.Prefabs
             FitSeat(go);
         }
 
-        public static void ApplyStats(GameObject go)
-        {
-            ApplyStats(go, MountSettings.Find(go) ?? MountSettings.Javali);
-        }
-
-        public static void ApplyStats(GameObject go, MountProfile profile)
-        {
-            if (go == null) return;
-            float health = profile != null ? Mathf.Max(1f, profile.MaxHealth.Value) : MountSettings.Health;
-            float stamina = profile != null ? Mathf.Max(1f, profile.MaxStamina.Value) : MountSettings.Stamina;
-            float drain = profile != null ? Mathf.Max(0f, profile.StaminaDrain.Value) : MountSettings.Drain;
-
-            var character = go.GetComponent<Character>();
-            if (character != null)
-            {
-                Access.Set(character, "m_health", health);
-                var nview = character.GetComponent<ZNetView>();
-                if (nview != null && nview.IsValid())
-                {
-                    float oldMax = Mathf.Max(1f, character.GetMaxHealth());
-                    float oldHp = character.GetHealth();
-                    Access.Call(character, "SetMaxHealth", health);
-                    float pct = Mathf.Clamp01(oldHp / oldMax);
-                    if (pct > 0.98f)
-                        pct = 1f;
-                    character.SetHealth(health * pct);
-                }
-            }
-
-            var sadle = go.GetComponentInChildren<Sadle>(true);
-            if (sadle == null) return;
-
-            float oldMaxSta = stamina;
-            if (Access.Call(sadle, "GetMaxStamina") is float maxSta)
-                oldMaxSta = Mathf.Max(1f, maxSta);
-            float oldSta = oldMaxSta;
-            if (Access.Call(sadle, "GetStamina") is float curSta)
-                oldSta = curSta;
-
-            Access.Set(sadle, "m_maxStamina", stamina);
-            Access.Set(sadle, "m_runStaminaDrain", drain);
-            Access.Set(sadle, "m_staminaDrain", drain);
-            Access.Set(sadle, "m_staminaDrainPerSec", drain);
-            Access.Set(sadle, "m_swimStaminaDrain", drain * 2f);
-            Access.Call(sadle, "SetMaxStamina", stamina);
-            float staPct = Mathf.Clamp01(oldSta / oldMaxSta);
-            if (staPct > 0.98f)
-                staPct = 1f;
-            var staminaView = Access.Get(sadle, "m_nview") as ZNetView;
-            if (staminaView != null && staminaView.IsValid() && staminaView.GetZDO() != null)
-                Access.Call(sadle, "SetStamina", stamina * staPct);
-        }
-
         public static void ApplyAll(GameObject go)
         {
             if (go == null) return;
             var profile = MountSettings.Find(go) ?? MountSettings.Javali;
             ApplyMoveSpeed(go.GetComponent<Character>(), profile);
             ApplyScale(go, profile);
-            ApplyStats(go, profile);
+        }
+
+        public static void ApplyInfiniteStamina(GameObject go)
+        {
+            var saddle = go != null ? go.GetComponentInChildren<Sadle>(true) : null;
+            if (saddle == null) return;
+
+            Access.Set(saddle, "m_maxStamina", InfiniteStamina);
+            Access.Set(saddle, "m_runStaminaDrain", 0f);
+            Access.Set(saddle, "m_staminaDrain", 0f);
+            Access.Set(saddle, "m_staminaDrainPerSec", 0f);
+            Access.Set(saddle, "m_swimStaminaDrain", 0f);
+            Access.Call(saddle, "SetMaxStamina", InfiniteStamina);
+            Access.Call(saddle, "SetStamina", InfiniteStamina);
         }
 
         public static void ApplyProfile(MountProfile profile)
@@ -176,7 +137,6 @@ namespace ValheimMontarias.Prefabs
             {
                 ApplyMoveSpeed(target.GetComponent<Character>(), profile);
                 ApplyScale(target, profile);
-                ApplyStats(target, profile);
             }
         }
 
@@ -258,7 +218,6 @@ namespace ValheimMontarias.Prefabs
             {
                 ApplyMoveSpeed(Prefab.GetComponent<Character>(), MountSettings.Find(Prefab) ?? MountSettings.Javali);
                 ApplyScale(Prefab, MountSettings.Find(Prefab) ?? MountSettings.Javali);
-                ApplyStats(Prefab, MountSettings.Find(Prefab) ?? MountSettings.Javali);
             }
             foreach (var character in Character.GetAllCharacters())
             {
@@ -303,7 +262,6 @@ namespace ValheimMontarias.Prefabs
                 if (profile.Id == MountSettings.Javali?.Id && Prefab == null)
                     Prefab = existing;
                 ApplyMoveSpeed(existing != null ? existing.GetComponent<Character>() : null, profile);
-                ApplyStats(existing, profile);
                 return;
             }
 
@@ -327,11 +285,17 @@ namespace ValheimMontarias.Prefabs
             if (nview != null)
                 nview.m_persistent = false;
 
-            var tame = clone.GetComponent<Tameable>();
-            if (tame != null)
+            var tame = clone.GetComponent<Tameable>() ?? clone.AddComponent<Tameable>();
+            Access.Set(tame, "m_commandable", true);
+            Access.Set(tame, "m_startsTamed", true);
+
+            var ai = clone.GetComponent<BaseAI>();
+            if (ai != null)
             {
-                Access.Set(tame, "m_commandable", true);
-                Access.Set(tame, "m_startsTamed", true);
+                Access.Set(ai, "m_enableHuntPlayer", false);
+                Access.Set(ai, "m_aggravatable", false);
+                if (profile.Id == "eikthyr")
+                    Access.Set(ai, "m_canBeAlerted", false);
             }
 
             var character = clone.GetComponent<Character>();
@@ -347,7 +311,6 @@ namespace ValheimMontarias.Prefabs
                 procreation.enabled = false;
 
             AttachSaddle(scene, clone, tame, character);
-            ApplyStats(clone, profile);
             clone.AddComponent<JavaliControl>();
 
             if (profile.Id == MountSettings.Javali?.Id)
@@ -457,11 +420,11 @@ namespace ValheimMontarias.Prefabs
             Access.Set(sadle, "m_attachAnimation", "attach_chair");
             Access.Set(sadle, "m_maxUseRange", 4.5f);
             Access.Set(sadle, "m_dropSaddleOnDeath", false);
-            Access.Set(sadle, "m_maxStamina", MountSettings.Stamina);
-            Access.Set(sadle, "m_runStaminaDrain", MountSettings.Drain);
-            Access.Set(sadle, "m_staminaDrain", MountSettings.Drain);
-            Access.Set(sadle, "m_staminaDrainPerSec", MountSettings.Drain);
-            Access.Set(sadle, "m_swimStaminaDrain", MountSettings.Drain * 2f);
+            Access.Set(sadle, "m_maxStamina", InfiniteStamina);
+            Access.Set(sadle, "m_runStaminaDrain", 0f);
+            Access.Set(sadle, "m_staminaDrain", 0f);
+            Access.Set(sadle, "m_staminaDrainPerSec", 0f);
+            Access.Set(sadle, "m_swimStaminaDrain", 0f);
             if (tame != null)
                 Access.Set(tame, "m_saddle", sadle);
         }

@@ -32,10 +32,8 @@ namespace ValheimMontarias
         public ConfigEntry<float> SaddleXOffset;
         public ConfigEntry<float> SaddleYOffset;
         public ConfigEntry<float> SaddleZOffset;
+        public ConfigEntry<string> SaddlePrefab;
         public ConfigEntry<float> CastSeconds;
-        public ConfigEntry<float> MaxHealth;
-        public ConfigEntry<float> MaxStamina;
-        public ConfigEntry<float> StaminaDrain;
         public ConfigEntry<int> RequiredRank;
         public ConfigEntry<string> AllowedSteamIds;
 
@@ -73,9 +71,6 @@ namespace ValheimMontarias
         public static ConfigEntry<float> Scale => Javali?.Scale;
         public static ConfigEntry<float> SeatOffset => Javali?.SeatOffset;
         public static ConfigEntry<float> CastSeconds => Javali?.CastSeconds;
-        public static ConfigEntry<float> MaxHealth => Javali?.MaxHealth;
-        public static ConfigEntry<float> MaxStamina => Javali?.MaxStamina;
-        public static ConfigEntry<float> StaminaDrain => Javali?.StaminaDrain;
         public static ConfigEntry<bool> LockConfig;
         public static ConfigEntry<bool> UnlockAll;
         public static ConfigEntry<KeyboardShortcut> MenuKey;
@@ -93,9 +88,6 @@ namespace ValheimMontarias
             ? new Vector3(Javali.SaddleXOffset.Value, Javali.SaddleYOffset.Value, Javali.SaddleZOffset.Value)
             : Vector3.zero;
         public static float Cast => Javali != null ? Mathf.Max(0.1f, Javali.CastSeconds.Value) : 2f;
-        public static float Health => Javali != null ? Mathf.Max(1f, Javali.MaxHealth.Value) : 100f;
-        public static float Stamina => Javali != null ? Mathf.Max(1f, Javali.MaxStamina.Value) : 250f;
-        public static float Drain => Javali != null ? Mathf.Max(0f, Javali.StaminaDrain.Value) : 8f;
 
         public static void Init(BaseUnityPlugin plugin, ConfigSync sync)
         {
@@ -109,7 +101,7 @@ namespace ValheimMontarias
             Javali = All.Length > 0 ? All[0] : null;
 
             foreach (var profile in All)
-                BindProfile(plugin, sync, profile, "Montaria" + profile.Id, 12f, 5.5f, 8.5f, 1f, 2f, 100f, 250f, 8f);
+                BindProfile(plugin, sync, profile, "Montaria" + profile.Id, 12f, 5.5f, 8.5f, 1f, 2f);
 
             LockConfig = plugin.Config.Bind("Geral", "LockConfig", true,
                 "Clientes usam a config do servidor.");
@@ -190,7 +182,7 @@ namespace ValheimMontarias
 
         private static void BindProfile(
             BaseUnityPlugin plugin, ConfigSync sync, MountProfile profile, string group,
-            float run, float walk, float jump, float scale, float cast, float health, float stamina, float drain)
+            float run, float walk, float jump, float scale, float cast)
         {
             profile.CustomName = Bind(plugin, sync, group, "Nome", profile.DefaultName, "Nome exibido da montaria.");
             if (profile.CustomName.Value == "Javali")
@@ -211,10 +203,9 @@ namespace ValheimMontarias
                 "Deslocamento vertical da sela em unidades do modelo.");
             profile.SaddleZOffset = Bind(plugin, sync, group, "SelaOffsetZ", 0f,
                 "Deslocamento frente/trás da sela em unidades do modelo.");
+            profile.SaddlePrefab = Bind(plugin, sync, group, "PrefabSela", "SaddleLox",
+                "Prefab de item da sela usado na aparência da montaria (ex.: SaddleLox, SaddleAsksvin).");
             profile.CastSeconds = Bind(plugin, sync, group, "CastSegundos", cast, "Tempo de conjuração para invocar.");
-            profile.MaxHealth = Bind(plugin, sync, group, "Vida", health, "Vida máxima da montaria.");
-            profile.MaxStamina = Bind(plugin, sync, group, "Stamina", stamina, "Stamina máxima da montaria.");
-            profile.StaminaDrain = Bind(plugin, sync, group, "DrenoStamina", drain, "Stamina gasta por segundo ao correr.");
             profile.RequiredRank = Bind(plugin, sync, group, "HabilidadeMinima", 1,
                 "Nível da Habilidade de Montaria exigido para invocar (1 = o primeiro nível).");
             if (profile.Id == "capivara")
@@ -227,15 +218,13 @@ namespace ValheimMontarias
             profile.RunSpeed.SettingChanged += (_, __) => profile.ApplyAll();
             profile.WalkSpeed.SettingChanged += (_, __) => profile.ApplyAll();
             profile.JumpHeight.SettingChanged += (_, __) => profile.ApplyAll();
-            profile.MaxHealth.SettingChanged += (_, __) => profile.ApplyAll();
-            profile.MaxStamina.SettingChanged += (_, __) => profile.ApplyAll();
-            profile.StaminaDrain.SettingChanged += (_, __) => profile.ApplyAll();
             profile.SeatOffset.SettingChanged += (_, __) => profile.ApplyAll();
             profile.SeatXOffset.SettingChanged += (_, __) => profile.ApplyAll();
             profile.SeatZOffset.SettingChanged += (_, __) => profile.ApplyAll();
             profile.SaddleXOffset.SettingChanged += (_, __) => profile.ApplyAll();
             profile.SaddleYOffset.SettingChanged += (_, __) => profile.ApplyAll();
             profile.SaddleZOffset.SettingChanged += (_, __) => profile.ApplyAll();
+            profile.SaddlePrefab.SettingChanged += (_, __) => profile.ApplyAll();
             profile.Scale.SettingChanged += (_, __) =>
             {
                 profile.ApplyAll();

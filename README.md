@@ -64,8 +64,8 @@ por reflexão: catálogo (montarias, níveis), o estado do jogador local e, no s
 `BepInEx/config/com.valheimmontarias.mod.cfg`, sincronizado pelo servidor
 (`LockConfig = true`):
 
-- `[Montaria]` (Capivara): `Nome`, `VelocidadeCorrida`, `VelocidadeAndar`, `AlturaPulo`,
-  `Escala`, `CastSegundos`, `Vida`, `Stamina`, `DrenoStamina`, `HabilidadeMinima`.
+- `[Montaria<id>]`: `Nome`, `VelocidadeCorrida`, `VelocidadeAndar`, `AlturaPulo`,
+  `Escala`, `PrefabSela`, `CastSegundos`, `HabilidadeMinima`.
 - `[Habilidade]`: `Niveis`.
 - `[Geral]`: `LockConfig`, `LiberarTodasGratis`, `TeclaMenu`, `TeclaInvocar`.
 

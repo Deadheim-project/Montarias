@@ -387,7 +387,6 @@ namespace ValheimMontarias
                 $"Habilidade exigida: {RidingRanks.NameOf(profile.MinRank)}\n" +
                 $"Velocidade: {Value(profile.RunSpeed) * bonus:0.#}" +
                 (bonus > 1.001f ? $" <color=#9a9188>(+{(bonus - 1f) * 100f:0}% da sua habilidade)</color>" : "") + "\n" +
-                $"Vida: {Value(profile.MaxHealth):0}   Stamina: {Value(profile.MaxStamina):0}\n" +
                 "Use o item da montaria para montar; E ou o item para descer.",
                 15, ValheimUi.Beige, TextAlignmentOptions.TopLeft);
             ValheimUi.Anchor((RectTransform)stats.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
@@ -590,9 +589,6 @@ namespace ValheimMontarias
             AddStat("Velocidade", selected.RunSpeed, 3f, 30f);
             AddStat("Pulo", selected.JumpHeight, 3f, 20f);
             AddStat("Escala", selected.Scale, 0.5f, 3f);
-            AddStat("Vida", selected.MaxHealth, 10f, 1000f);
-            AddStat("Stamina", selected.MaxStamina, 10f, 1000f);
-            AddStat("Dreno", selected.StaminaDrain, 0f, 40f);
             AddIntStat("Habilidade exigida (nível)", selected.RequiredRank, 1, Mathf.Max(1, RidingRanks.Count));
 
             var apply = ValheimUi.CreateButton(_adminEditor, "Aplicar stats", 0f, 42f, 15);
