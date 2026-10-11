@@ -676,7 +676,7 @@ namespace ValheimMontarias.Prefabs
                 return true;
             }
 
-            // E (Use) gets you off, like the mount item and H do. The mount goes with it.
+            // E (Use) gets you off, like the mount item and the summon key do. The mount goes with it.
             if (Access.DismountPressed())
             {
                 Dismount(player);
@@ -804,8 +804,9 @@ namespace ValheimMontarias.Prefabs
             if (CombatLock.IsInCombat(player))
                 return "Em combate: não é possível usar a montaria";
             if (Access.IsAdmin())
-                return "[<color=yellow><b>E</b></color>] Ajustes da montaria (admin)\nU abre o menu  ·  H monta/desmonta";
-            return "E, H ou o item da montaria desmontam.\nMontado: Espaço salta, clique investida";
+                return "[<color=yellow><b>E</b></color>] Ajustes da montaria (admin)\n" +
+                    $"{MountSettings.MenuKeyName()} abre o menu  ·  {MountSettings.SummonKeyName()} monta/desmonta";
+            return $"E, {MountSettings.SummonKeyName()} ou o item da montaria desmontam.\nMontado: Espaço salta, clique investida";
         }
     }
 }

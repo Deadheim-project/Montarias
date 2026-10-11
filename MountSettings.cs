@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using BepInEx;
 using BepInEx.Configuration;
 using ServerSync;
@@ -108,17 +109,31 @@ namespace ValheimMontarias
 
             MenuKey = plugin.Config.Bind("Geral", "TeclaMenu", new KeyboardShortcut(KeyCode.U),
                 "Abre o menu de montarias.");
-            SummonKey = plugin.Config.Bind("Geral", "TeclaInvocar", new KeyboardShortcut(KeyCode.H),
+            SummonKey = plugin.Config.Bind("Geral", "TeclaInvocar", new KeyboardShortcut(KeyCode.I),
                 "Monta na montaria escolhida (já sai montado, como no WoW) ou desmonta.");
             SelectedMount = plugin.Config.Bind("Geral", "MontariaSelecionada", "javali",
                 "Id da última montaria escolhida no menu.");
+            var keysVersion = plugin.Config.Bind("Geral", "VersaoTeclas", 0,
+                "Uso interno: migração das teclas padrão. Não edite.");
 
             if (MenuKey.Value.MainKey == KeyCode.H && SummonKey.Value.MainKey == KeyCode.J)
             {
                 MenuKey.Value = new KeyboardShortcut(KeyCode.U);
-                SummonKey.Value = new KeyboardShortcut(KeyCode.H);
+                SummonKey.Value = new KeyboardShortcut(KeyCode.I);
+            }
+            // Montar saiu do H, que e o painel da Arena do NpcValheim, para o I (O e do Guilds). So
+            // uma vez, para nao desfazer quem escolher o H de proposito depois.
+            if (keysVersion.Value < 1)
+            {
+                if (SummonKey.Value.MainKey == KeyCode.H && SummonKey.Value.Modifiers.Count() == 0)
+                    SummonKey.Value = new KeyboardShortcut(KeyCode.I);
+                keysVersion.Value = 1;
             }
         }
+
+        public static string MenuKeyName() => MenuKey != null ? MenuKey.Value.MainKey.ToString() : "U";
+
+        public static string SummonKeyName() => SummonKey != null ? SummonKey.Value.MainKey.ToString() : "I";
 
         public static MountProfile ByItem(string itemPrefab)
         {

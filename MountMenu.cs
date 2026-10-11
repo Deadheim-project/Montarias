@@ -81,8 +81,8 @@ namespace ValheimMontarias
 
         public static void Close() => _instance?.CloseInternal();
 
-        /// <summary>The mount H summons: the one chosen in the menu if it can be summoned, else
-        /// the first that can, else the chosen one anyway so H explains what is missing.</summary>
+        /// <summary>The mount the summon key (I) summons: the one chosen in the menu if it can be summoned, else
+        /// the first that can, else the chosen one anyway so the key explains what is missing.</summary>
         public static MountProfile Selected()
         {
             var chosen = MountSettings.ById(MountSettings.SelectedMount != null ? MountSettings.SelectedMount.Value : null);
@@ -396,7 +396,7 @@ namespace ValheimMontarias
                 $"Velocidade: {Value(profile.RunSpeed) * bonus:0.#}" +
                 (bonus > 1.001f ? $" <color=#9a9188>(+{(bonus - 1f) * 100f:0}% da sua habilidade)</color>" : "") + "\n" +
                 $"Vida: {Value(profile.MaxHealth):0}   Stamina: {Value(profile.MaxStamina):0}\n" +
-                "Use o item da montaria (ou H) para montar; E, H ou o item para descer.",
+                $"Use o item da montaria (ou {MountSettings.SummonKeyName()}) para montar; E, {MountSettings.SummonKeyName()} ou o item para descer.",
                 15, ValheimUi.Beige, TextAlignmentOptions.TopLeft);
             ValheimUi.Anchor((RectTransform)stats.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(192f, -200f), new Vector2(-16f, -92f));
@@ -436,14 +436,14 @@ namespace ValheimMontarias
 
             bool onKey = profile == selected;
             var choose = ValheimUi.CreateButton(_journalDetail,
-                onKey ? $"Já está no {SummonKeyName()}" : $"Usar no {SummonKeyName()}", 170f, 40f, 16);
+                onKey ? $"Já está no {MountSettings.SummonKeyName()}" : $"Usar no {MountSettings.SummonKeyName()}", 170f, 40f, 16);
             ValheimUi.Anchor((RectTransform)choose.transform, new Vector2(1f, 0f), new Vector2(1f, 0f),
                 new Vector2(-344f, 16f), new Vector2(-174f, 56f));
             choose.interactable = !onKey;
             choose.onClick.AddListener(() =>
             {
                 Select(profile);
-                Say($"{SummonKeyName()} agora monta na {profile.Name}.");
+                Say($"{MountSettings.SummonKeyName()} agora monta na {profile.Name}.");
             });
         }
 
@@ -452,7 +452,7 @@ namespace ValheimMontarias
             if (!MountRoster.Known) return "Consultando o servidor...";
             if (!MountRoster.Owns(profile)) return "Não possui · à venda no Mestre das Montarias";
             if (!MountRoster.CanRide(profile)) return $"Exige {RidingRanks.NameOf(profile.MinRank)}";
-            return profile == selected ? $"Pronta · no {SummonKeyName()}" : "Pronta";
+            return profile == selected ? $"Pronta · no {MountSettings.SummonKeyName()}" : "Pronta";
         }
 
         private static bool IsSummoned(MountProfile profile) =>
@@ -772,13 +772,10 @@ namespace ValheimMontarias
             }
         }
 
-        private static string SummonKeyName() =>
-            MountSettings.SummonKey != null ? MountSettings.SummonKey.Value.MainKey.ToString() : "H";
-
         private static string HintText()
         {
-            string menu = MountSettings.MenuKey != null ? MountSettings.MenuKey.Value.MainKey.ToString() : "U";
-            return $"{menu} fecha  ·  {SummonKeyName()} monta/desmonta  ·  Esc fecha";
+            string menu = MountSettings.MenuKeyName();
+            return $"{menu} fecha  ·  {MountSettings.SummonKeyName()} monta/desmonta  ·  Esc fecha";
         }
 
         private static string Sanitize(string value, string fallback)

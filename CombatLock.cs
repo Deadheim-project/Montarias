@@ -1,9 +1,10 @@
 namespace ValheimMontarias
 {
     /// <summary>
-    /// Soft link to the combat status of other mods. Deadheim (Detalhes.Deadheim) shows
-    /// "DH_Combat" while its CombatStatusIcon is on; the old standalone Detalhes.Combat used
-    /// "Combat". Without either mod the status never exists and these checks stay false.
+    /// Combat comes from Deadheim, which absorbed the old Detalhes.Combat. Any of these counts:
+    /// the "DH_Combat" buff (fighting a player or a monster), the Combat bit Deadheim publishes on
+    /// the player's ZDO (dh_pvpFlags, present even with the buff turned off in its cfg) and the
+    /// legacy "Combat" status. Without Deadheim none of them exist and the checks stay false.
     /// </summary>
     internal static class CombatLock
     {
@@ -12,6 +13,9 @@ namespace ValheimMontarias
             "DH_Combat".GetStableHashCode(),
             "Combat".GetStableHashCode()
         };
+        private static readonly int DeadheimFlagsKey = "dh_pvpFlags".GetStableHashCode();
+        // PvpFlags.Combat in Deadheim (Pvp/PvpState.cs).
+        private const int DeadheimFlagCombat = 16;
 
         public const string Message = "Você não pode usar montarias em combate.";
 
@@ -19,13 +23,19 @@ namespace ValheimMontarias
         {
             if (player == null) return false;
             var seman = player.GetSEMan();
-            if (seman == null) return false;
-            for (int i = 0; i < StatusHashes.Length; i++)
+            if (seman != null)
             {
-                if (seman.HaveStatusEffect(StatusHashes[i]))
-                    return true;
+                for (int i = 0; i < StatusHashes.Length; i++)
+                {
+                    if (seman.HaveStatusEffect(StatusHashes[i]))
+                        return true;
+                }
             }
-            return false;
+            // GetComponent, not Character.m_nview: without AllowUnsafeBlocks reading the field
+            // threw FieldAccessException in game (0.1.67).
+            var nview = player.GetComponent<ZNetView>();
+            var zdo = nview != null && nview.IsValid() ? nview.GetZDO() : null;
+            return zdo != null && (zdo.GetInt(DeadheimFlagsKey, 0) & DeadheimFlagCombat) != 0;
         }
 
         public static bool Block(Player player)
