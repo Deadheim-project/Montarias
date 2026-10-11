@@ -780,16 +780,24 @@ namespace ValheimMontarias
 
         private static bool Typing()
         {
+            if ((Chat.instance != null && Chat.instance.HasFocus()) || Console.IsVisible() ||
+                (TextInput.instance != null && TextInput.IsVisible()))
+                return true;
+
             var es = EventSystem.current;
-            if (es == null || es.currentSelectedGameObject == null) return false;
-            return es.currentSelectedGameObject.GetComponent<TMP_InputField>() != null
-                || es.currentSelectedGameObject.GetComponent<InputField>() != null;
+            GameObject selected = es != null ? es.currentSelectedGameObject : null;
+            if (!selected) return false;
+
+            TMP_InputField tmpInput = selected.GetComponentInParent<TMP_InputField>();
+            if (tmpInput && tmpInput.isFocused) return true;
+
+            InputField input = selected.GetComponentInParent<InputField>();
+            return input && input.isFocused;
         }
 
         private static bool BusyElsewhere()
         {
-            if (Console.IsVisible()) return true;
-            if (TextInput.IsVisible()) return true;
+            if (Typing() || Menu.IsVisible()) return true;
             var player = Player.m_localPlayer;
             return player != null && player.IsDead();
         }
