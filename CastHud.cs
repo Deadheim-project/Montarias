@@ -12,7 +12,7 @@ namespace ValheimMontarias
 
             float width = Screen.width * 0.38f;
             float height = 22f;
-            float x = (Screen.width - width) * 0.5f;
+            float x = (Screen.width - width) * 0.2f;
             float y = Screen.height - 96f;
 
             GUI.color = new Color(0f, 0f, 0f, 0.65f);

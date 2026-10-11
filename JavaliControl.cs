@@ -365,7 +365,7 @@ namespace ValheimMontarias.Prefabs
         /// <summary>
         /// Asks the saddle for control straight away. The summoner owns the new mount, so the
         /// saddle's own request handler can be run here and its answer comes back locally, in
-        /// this same frame -- without going through Sadle.Interact's walk-up checks, which are
+        /// this same frame -- without going throughOkInteract's walk-up checks, which are
         /// about reaching a mount, not about one born under you. Interact stays as the fallback.
         /// </summary>
         private static void AttachNow(GameObject go, Player player)

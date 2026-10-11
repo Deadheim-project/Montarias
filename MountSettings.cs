@@ -24,6 +24,7 @@ namespace ValheimMontarias
         public ConfigEntry<float> WalkSpeed;
         public ConfigEntry<float> JumpHeight;
         public ConfigEntry<float> Scale;
+        public ConfigEntry<float> SeatOffset;
         public ConfigEntry<float> CastSeconds;
         public ConfigEntry<float> MaxHealth;
         public ConfigEntry<float> MaxStamina;
@@ -62,6 +63,7 @@ namespace ValheimMontarias
         public static ConfigEntry<float> WalkSpeed => Javali?.WalkSpeed;
         public static ConfigEntry<float> JumpHeight => Javali?.JumpHeight;
         public static ConfigEntry<float> Scale => Javali?.Scale;
+        public static ConfigEntry<float> SeatOffset => Javali?.SeatOffset;
         public static ConfigEntry<float> CastSeconds => Javali?.CastSeconds;
         public static ConfigEntry<float> MaxHealth => Javali?.MaxHealth;
         public static ConfigEntry<float> MaxStamina => Javali?.MaxStamina;
@@ -77,6 +79,7 @@ namespace ValheimMontarias
         public static float Walk => Javali != null ? Javali.WalkSpeed.Value : 5.5f;
         public static float Jump => Javali != null ? Javali.JumpHeight.Value : 8.5f;
         public static float Size => Javali != null ? Mathf.Clamp(Javali.Scale.Value, 0.5f, 3f) : 1f;
+        public static float SeatHeightOffset => Javali != null ? Mathf.Clamp(Javali.SeatOffset.Value, -2f, 2f) : 0f;
         public static float Cast => Javali != null ? Mathf.Max(0.1f, Javali.CastSeconds.Value) : 2f;
         public static float Health => Javali != null ? Mathf.Max(1f, Javali.MaxHealth.Value) : 100f;
         public static float Stamina => Javali != null ? Mathf.Max(1f, Javali.MaxStamina.Value) : 250f;
@@ -180,6 +183,8 @@ namespace ValheimMontarias
             profile.WalkSpeed = Bind(plugin, sync, group, "VelocidadeAndar", walk, "Velocidade de andar da montaria.");
             profile.JumpHeight = Bind(plugin, sync, group, "AlturaPulo", jump, "Impulso vertical do pulo da montaria.");
             profile.Scale = Bind(plugin, sync, group, "Escala", scale, "Escala da montaria (1 = tamanho vanilla).");
+            profile.SeatOffset = Bind(plugin, sync, group, "AlturaAssento", 0f,
+                "Ajuste vertical do personagem ao montar (positivo sobe, negativo desce).");
             profile.CastSeconds = Bind(plugin, sync, group, "CastSegundos", cast, "Tempo de conjuração para invocar.");
             profile.MaxHealth = Bind(plugin, sync, group, "Vida", health, "Vida máxima da montaria.");
             profile.MaxStamina = Bind(plugin, sync, group, "Stamina", stamina, "Stamina máxima da montaria.");
@@ -194,6 +199,7 @@ namespace ValheimMontarias
             profile.MaxHealth.SettingChanged += (_, __) => profile.ApplyAll();
             profile.MaxStamina.SettingChanged += (_, __) => profile.ApplyAll();
             profile.StaminaDrain.SettingChanged += (_, __) => profile.ApplyAll();
+            profile.SeatOffset.SettingChanged += (_, __) => profile.ApplyAll();
             profile.Scale.SettingChanged += (_, __) =>
             {
                 profile.ApplyAll();

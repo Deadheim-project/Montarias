@@ -232,6 +232,7 @@ namespace ValheimMontarias.Prefabs
             var anchor = saddle.GetComponent<MountSaddleAnchor>();
             if (anchor != null)
                 sit = anchor.SitHeight;
+            sit += MountSettings.SeatHeightOffset;
 
             Vector3 world = saddle.position + mount.transform.up * sit;
             attach.localPosition = mount.transform.InverseTransformPoint(world);
