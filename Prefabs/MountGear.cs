@@ -336,6 +336,9 @@ namespace ValheimMontarias.Prefabs
                 return new Vector3(0f, bounds.min.y + bounds.size.y * 0.88f, bounds.center.z);
             }
 
+            // Mesh bounds in each renderer's own space, never Renderer.bounds: the mount is
+            // fitted while hidden (renderers disabled), and a disabled renderer reports empty
+            // bounds at the world origin, which threw the seat -- and the rider -- far away.
             var renderers = overlay.GetComponentsInChildren<Renderer>(true);
             var min = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
             var max = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
@@ -344,14 +347,19 @@ namespace ValheimMontarias.Prefabs
             {
                 var renderer = renderers[i];
                 if (renderer == null || IsSaddle(renderer.transform)) continue;
-                var bounds = renderer.bounds;
+                if (renderer.GetComponentInParent<Player>() != null) continue;
+                Mesh rendererMesh = renderer is SkinnedMeshRenderer skinned
+                    ? skinned.sharedMesh
+                    : renderer is MeshRenderer ? renderer.GetComponent<MeshFilter>()?.sharedMesh : null;
+                if (rendererMesh == null) continue;
+                var bounds = rendererMesh.bounds;
                 for (int corner = 0; corner < 8; corner++)
                 {
-                    var world = new Vector3(
+                    var point = new Vector3(
                         (corner & 1) == 0 ? bounds.min.x : bounds.max.x,
                         (corner & 2) == 0 ? bounds.min.y : bounds.max.y,
                         (corner & 4) == 0 ? bounds.min.z : bounds.max.z);
-                    var local = overlay.InverseTransformPoint(world);
+                    var local = overlay.InverseTransformPoint(renderer.transform.TransformPoint(point));
                     min = Vector3.Min(min, local);
                     max = Vector3.Max(max, local);
                     found = true;
