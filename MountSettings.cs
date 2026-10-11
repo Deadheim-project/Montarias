@@ -88,6 +88,16 @@ namespace ValheimMontarias
         public static Vector3 SaddlePositionOffset => Javali != null
             ? new Vector3(Javali.SaddleXOffset.Value, Javali.SaddleYOffset.Value, Javali.SaddleZOffset.Value)
             : Vector3.zero;
+        public static float SeatHeightOffsetFor(MountProfile profile) =>
+            profile?.SeatOffset != null ? Mathf.Clamp(profile.SeatOffset.Value, -2f, 2f) : SeatHeightOffset;
+        public static Vector3 SeatPositionOffsetFor(MountProfile profile) =>
+            profile?.SeatXOffset != null && profile.SeatZOffset != null
+                ? new Vector3(profile.SeatXOffset.Value, 0f, profile.SeatZOffset.Value)
+                : SeatPositionOffset;
+        public static Vector3 SaddlePositionOffsetFor(MountProfile profile) =>
+            profile?.SaddleXOffset != null && profile.SaddleYOffset != null && profile.SaddleZOffset != null
+                ? new Vector3(profile.SaddleXOffset.Value, profile.SaddleYOffset.Value, profile.SaddleZOffset.Value)
+                : SaddlePositionOffset;
         public static float Cast => Javali != null ? Mathf.Max(0.1f, Javali.CastSeconds.Value) : 2f;
 
         public static void Init(BaseUnityPlugin plugin, ConfigSync sync)

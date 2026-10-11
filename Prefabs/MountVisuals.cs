@@ -35,6 +35,9 @@ namespace ValheimMontarias.Prefabs
                     _loggedMissing = true;
                     Plugin.Log.LogWarning($"ValheimMontarias: {ResolveAsset(profile)}.skin not found, keeping the vanilla mount mesh");
                 }
+                float mountScale = profile?.Scale != null ? Mathf.Clamp(profile.Scale.Value, 0.5f, 3f) : 1f;
+                MountGear.Attach(go, parent, 0.52f * mountScale, -0.38f,
+                    MountGear.SaddleBackPoint(parent) + MountSettings.SaddlePositionOffsetFor(profile), false);
                 return;
             }
 
@@ -62,8 +65,9 @@ namespace ValheimMontarias.Prefabs
             HideVanillaMeshes(go);
             DisableLod(go);
             // Place the saddle at the torso-top anchor computed from the skin mesh.
-            MountGear.Attach(go, overlay.transform, 0.52f * MountSettings.Size, -0.38f,
-                skin.SeatLocal + MountSettings.SaddlePositionOffset, false);
+            float scale = profile?.Scale != null ? Mathf.Clamp(profile.Scale.Value, 0.5f, 3f) : 1f;
+            MountGear.Attach(go, overlay.transform, 0.52f * scale, -0.38f,
+                skin.SeatLocal + MountSettings.SaddlePositionOffsetFor(profile), false);
         }
 
         public static Transform Overlay(GameObject go)

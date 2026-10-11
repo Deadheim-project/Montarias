@@ -264,6 +264,17 @@ namespace ValheimMontarias
                 look = player.transform.forward;
             look.Normalize();
             bool run = RunHeld();
+
+            if (Get(controller, "m_character") is Character rideCharacter)
+            {
+                var ai = rideCharacter.GetComponent<BaseAI>();
+                if (ai != null)
+                {
+                    ai.StopMoving();
+                    Access.Call(ai, "ResetPatrolPoint");
+                }
+            }
+
             if (_applyControlls == null)
             {
                 MethodInfo best = null;
@@ -299,8 +310,8 @@ namespace ValheimMontarias
                 Plugin.Log.LogWarning($"ValheimMontarias: ApplyControlls failed: {e.InnerException?.Message ?? e.Message}");
             }
 
-            if (Get(controller, "m_character") is Character character)
-                character.SetRun(run);
+            if (Get(controller, "m_character") is Character mountCharacter)
+                mountCharacter.SetRun(run);
         }
 
         /// <summary>
@@ -311,10 +322,43 @@ namespace ValheimMontarias
         {
             if (controller == null) return;
             Call(controller, "ResetControlls");
-            if (Get(controller, "m_monsterAI") is MonsterAI ai)
-                ai.StopMoving();
-            if (Get(controller, "m_character") is Character character)
-                character.SetRun(false);
+
+            var mountCharacter = Get(controller, "m_character") as Character;
+            foreach (var aiCandidate in new object[]
+            {
+                Get(controller, "m_monsterAI"),
+                Get(controller, "m_ai"),
+                Get(controller, "m_baseAI"),
+                mountCharacter != null ? (Get(mountCharacter, "m_monsterAI") ?? Get(mountCharacter, "m_ai")) : null
+            })
+            {
+                if (aiCandidate == null) continue;
+                if (aiCandidate is Component c)
+                {
+                    Call(c, "StopMoving");
+                    continue;
+                }
+
+                var type = aiCandidate.GetType();
+                if (type.GetMethod("StopMoving", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) != null)
+                    Call(aiCandidate, "StopMoving");
+            }
+
+            if (mountCharacter != null)
+            {
+                mountCharacter.SetRun(false);
+                Set(mountCharacter, "m_moveDir", Vector3.zero);
+                Set(mountCharacter, "m_moveVelocity", Vector3.zero);
+                Set(mountCharacter, "m_speed", 0f);
+                Set(mountCharacter, "m_walkSpeed", 0f);
+                Set(mountCharacter, "m_runSpeed", 0f);
+                var rb = mountCharacter.GetComponent<Rigidbody>();
+                if (rb != null)
+                {
+                    rb.linearVelocity = Vector3.zero;
+                    rb.angularVelocity = Vector3.zero;
+                }
+            }
         }
 
         public static void PlayTrigger(Character character, string trigger)

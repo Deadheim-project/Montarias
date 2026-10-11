@@ -192,7 +192,7 @@ namespace ValheimMontarias.Prefabs
                 Object.DestroyImmediate(existing.gameObject);
 
             if (overlayLocal.sqrMagnitude < 1e-6f)
-                overlayLocal = BackPoint(overlay);
+                overlayLocal = SaddleBackPoint(overlay);
 
             var saddle = new GameObject(VisualName);
             saddle.transform.SetParent(overlay, false);
@@ -296,10 +296,11 @@ namespace ValheimMontarias.Prefabs
             var anchor = saddle.GetComponent<MountSaddleAnchor>();
             if (anchor != null)
                 sit = anchor.SitHeight;
-            sit += MountSettings.SeatHeightOffset;
+            var profile = MountSettings.Find(mount);
+            sit += MountSettings.SeatHeightOffsetFor(profile);
 
             Vector3 world = saddle.position + mount.transform.up * sit;
-            attach.localPosition = mount.transform.InverseTransformPoint(world) + MountSettings.SeatPositionOffset;
+            attach.localPosition = mount.transform.InverseTransformPoint(world) + MountSettings.SeatPositionOffsetFor(profile);
             attach.localRotation = Quaternion.identity;
         }
 
@@ -325,14 +326,42 @@ namespace ValheimMontarias.Prefabs
             return null;
         }
 
-        private static Vector3 BackPoint(Transform overlay)
+        public static Vector3 SaddleBackPoint(Transform overlay)
         {
             var skin = overlay.GetComponent<SkinnedMeshRenderer>();
             var mesh = skin != null ? skin.sharedMesh : overlay.GetComponent<MeshFilter>()?.sharedMesh;
-            if (mesh == null)
+            if (mesh != null)
+            {
+                var bounds = mesh.bounds;
+                return new Vector3(0f, bounds.min.y + bounds.size.y * 0.88f, bounds.center.z);
+            }
+
+            var renderers = overlay.GetComponentsInChildren<Renderer>(true);
+            var min = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
+            var max = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
+            bool found = false;
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                var renderer = renderers[i];
+                if (renderer == null || IsSaddle(renderer.transform)) continue;
+                var bounds = renderer.bounds;
+                for (int corner = 0; corner < 8; corner++)
+                {
+                    var world = new Vector3(
+                        (corner & 1) == 0 ? bounds.min.x : bounds.max.x,
+                        (corner & 2) == 0 ? bounds.min.y : bounds.max.y,
+                        (corner & 4) == 0 ? bounds.min.z : bounds.max.z);
+                    var local = overlay.InverseTransformPoint(world);
+                    min = Vector3.Min(min, local);
+                    max = Vector3.Max(max, local);
+                    found = true;
+                }
+            }
+
+            if (!found)
                 return new Vector3(0f, 0.55f, 0.05f);
-            var b = mesh.bounds;
-            return new Vector3(0f, b.min.y + b.size.y * 0.88f, b.center.z);
+            var size = max - min;
+            return new Vector3((min.x + max.x) * 0.5f, min.y + size.y * 0.88f, (min.z + max.z) * 0.5f);
         }
 
         private static Mesh VisualMesh()

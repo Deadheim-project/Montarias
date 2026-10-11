@@ -377,7 +377,7 @@ namespace ValheimMontarias.Prefabs
             try
             {
                 if (ZRoutedRpc.instance != null && Access.Get(ZRoutedRpc.instance, "m_id") is long self)
-                    Access.Call(sadle, "RPC_RequestControl", self, player.GetZDOID());
+                    Access.Call(sadle, "RPC_RequestControl", self, player.GetPlayerID());
                 if (!IsRiding(player))
                     TryMount(go, player);
             }
@@ -564,28 +564,6 @@ namespace ValheimMontarias.Prefabs
         public static bool IsRiding(Player player)
         {
             return TryGetRidden(player, out _, out _, out _);
-        }
-
-        public static void ApplyRiderLegPose(Player player)
-        {
-            if (player == null || !TryGetRidden(player, out var mount, out _, out _)) return;
-
-            var profile = MountSettings.Find(mount.gameObject);
-            float spread = profile?.LegSpread != null
-                ? Mathf.Clamp(profile.LegSpread.Value, 0f, 45f)
-                : 10f;
-            if (spread <= 0f) return;
-
-            var animator = player.GetComponentInChildren<Animator>();
-            if (animator == null || !animator.isHuman) return;
-
-            var leftLeg = animator.GetBoneTransform(HumanBodyBones.LeftUpperLeg);
-            var rightLeg = animator.GetBoneTransform(HumanBodyBones.RightUpperLeg);
-            if (leftLeg == null || rightLeg == null) return;
-
-            var forward = player.transform.forward;
-            leftLeg.rotation = Quaternion.AngleAxis(-spread, forward) * leftLeg.rotation;
-            rightLeg.rotation = Quaternion.AngleAxis(spread, forward) * rightLeg.rotation;
         }
 
         private static bool _wasRiding;
