@@ -770,11 +770,26 @@ namespace ValheimMontarias.Prefabs
             var nview = ai.GetComponent<ZNetView>();
             if (nview == null || !nview.IsValid() || !nview.IsOwner()) return false;
 
+            WakeUp(ai, nview);
             if (RideIntent(ai.gameObject, out var dir, out bool run))
                 ai.MoveTowards(dir, run);
             else
                 ai.StopMoving();
             return true;
+        }
+
+        /// <summary>
+        /// MonsterAI.UpdateSleep is what wakes a sleeping monster, and the AI above replaces
+        /// it: one that spawned asleep (Eikthyr, rearing) would stay in that pose forever.
+        /// Wakes it without MonsterAI.Wakeup, so no wake-up roar either.
+        /// </summary>
+        private static void WakeUp(BaseAI ai, ZNetView nview)
+        {
+            if (!(ai is MonsterAI monster) || !monster.m_sleeping) return;
+            monster.m_sleeping = false;
+            // BaseAI.m_animator is protected in the live assembly.
+            (Access.Get(ai, "m_animator") as ZSyncAnimation)?.SetBool("sleeping", false);
+            nview.GetZDO()?.Set(ZDOVars.s_sleeping, false);
         }
 
         private static bool RideIntent(GameObject mount, out Vector3 dir, out bool run)

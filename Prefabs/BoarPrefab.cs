@@ -292,6 +292,9 @@ namespace ValheimMontarias.Prefabs
             var ai = clone.GetComponent<BaseAI>();
             if (ai != null)
             {
+                // Eikthyr is summoned asleep (its sleeping pose is the rearing one) and only
+                // MonsterAI.UpdateSleep wakes it, which our ridden AI never runs.
+                Access.Set(ai, "m_sleeping", false);
                 Access.Set(ai, "m_enableHuntPlayer", false);
                 Access.Set(ai, "m_aggravatable", false);
                 if (profile.Id == "eikthyr")
