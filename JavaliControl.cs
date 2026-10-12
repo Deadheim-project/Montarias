@@ -732,12 +732,7 @@ namespace ValheimMontarias.Prefabs
             if (AdminMenu.IsOpen)
                 return true;
 
-            // E (Use) gets you off, like the mount item and the summon key do. The mount goes with it.
-            if (Access.DismountPressed())
-            {
-                Dismount(player);
-                return true;
-            }
+            // E (Use) does not get you off: only the mount item and the summon key do.
 
             if (Access.JumpPressed() || Input.GetKeyDown(KeyCode.Space))
             {

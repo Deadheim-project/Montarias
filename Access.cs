@@ -222,11 +222,6 @@ namespace ValheimMontarias
             return result is bool ridden && ridden;
         }
 
-        public static bool DismountPressed()
-        {
-            return ButtonDown("Use") || ButtonDown("KeyboardUse") || ButtonDown("JoyUse");
-        }
-
         public static void StopDoodad(Player player)
         {
             Call(player, "StopDoodadControl");

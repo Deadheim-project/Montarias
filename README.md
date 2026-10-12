@@ -28,7 +28,7 @@ Como no WoW, **não existe montaria vazia**:
 
 - **Use o item da montaria** (o *Apito da Capivara*, na hotbar ou no inventário): termina a
   conjuração (cancelada por movimento, ataque ou pulo) e você **aparece montado**.
-- **Saiu, sumiu:** usar o item de novo, **E** ou **H** tiram você da montaria, e ela some na
+- **Saiu, sumiu:** usar o item de novo ou **H** tiram você da montaria, e ela some na
   hora. Se o cavaleiro morre montado, ela some também. Se não der para montar ali, ela nem
   chega a aparecer. Ela não fica salva no mundo e sai junto com o jogador no logout.
 - O item vem para a bolsa quando você ganha a montaria (compra no Mestre das Montarias ou
