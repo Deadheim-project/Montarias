@@ -1,8 +1,10 @@
 using BepInEx;
 using BepInEx.Logging;
+using System.IO;
 using HarmonyLib;
 using ServerSync;
 using UnityEngine;
+using UnityEngine.Rendering;
 using ValheimMontarias.Prefabs;
 
 namespace ValheimMontarias
@@ -14,7 +16,7 @@ namespace ValheimMontarias
     {
         public const string Guid = "com.valheimmontarias.mod";
         public const string Name = "ValheimMontarias";
-        public const string Version = "0.3.17";
+        public const string Version = "0.3.18";
 
         internal static ManualLogSource Log;
         private Harmony _harmony;
@@ -41,6 +43,7 @@ namespace ValheimMontarias
         {
             Log = Logger;
             MountSettings.Init(this, ConfigSync);
+            WatchConfigFile();
             MountMenu.EnsureCreated();
             _harmony = new Harmony(Guid);
             try
@@ -68,6 +71,45 @@ namespace ValheimMontarias
             if (Localization.instance != null)
                 Patches.Localization_SetupLanguage_Patch.Apply(Localization.instance);
             Log.LogInfo($"{Name} v{Version} loaded");
+        }
+
+        private FileSystemWatcher _configWatcher;
+
+        /// <summary>
+        /// Edits to the cfg on a running dedicated server are read back (and ServerSync sends
+        /// them to every client), so SelaRotacao and the rest no longer need a restart. Server
+        /// only: on a client the server's values win, and reloading the local file would only
+        /// put stale values back.
+        /// </summary>
+        private void WatchConfigFile()
+        {
+            if (SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null)
+                return;
+            var path = Config.ConfigFilePath;
+            _configWatcher = new FileSystemWatcher(Path.GetDirectoryName(path), Path.GetFileName(path))
+            {
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName,
+                SynchronizingObject = ThreadingHelper.SynchronizingObject,
+                EnableRaisingEvents = true
+            };
+            _configWatcher.Changed += ReloadConfig;
+            _configWatcher.Created += ReloadConfig;
+            _configWatcher.Renamed += ReloadConfig;
+        }
+
+        private void ReloadConfig(object sender, FileSystemEventArgs e)
+        {
+            if (!File.Exists(Config.ConfigFilePath))
+                return;
+            try
+            {
+                Config.Reload();
+                Log.LogInfo("ValheimMontarias: config reloaded from disk");
+            }
+            catch (System.Exception ex)
+            {
+                Log.LogWarning($"ValheimMontarias: could not reload config: {ex.Message}");
+            }
         }
 
         private void Update()
@@ -129,6 +171,7 @@ namespace ValheimMontarias
 
         private void OnDestroy()
         {
+            _configWatcher?.Dispose();
             _harmony?.UnpatchSelf();
         }
     }

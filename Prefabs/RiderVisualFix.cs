@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using MagicaCloth2;
 using UnityEngine;
 
 namespace ValheimMontarias.Prefabs
@@ -16,15 +17,15 @@ namespace ValheimMontarias.Prefabs
 
         private sealed class ClothState
         {
-            public Cloth Cloth;
-            public ClothSphereColliderPair[] Original;
+            public MagicaCloth Cloth;
+            public List<ColliderComponent> Original;
+            public ColliderCollisionConstraint.Mode OriginalMode;
         }
 
         private readonly List<CapeTransformState> _capeTransforms = new List<CapeTransformState>();
         private readonly List<ClothState> _cloths = new List<ClothState>();
-        private GameObject _capeBlocker;
-        private SphereCollider _blockFront;
-        private SphereCollider _blockBack;
+        private MagicaCapsuleCollider _capeBlocker;
+        private float _blockerRadius;
         private Player _player;
         private Animator _animator;
         private Transform _leftLeg;
@@ -146,14 +147,14 @@ namespace ValheimMontarias.Prefabs
         }
 
         /// <summary>
-        /// The cape is cloth that only knows the rider's own body, so it fell straight through
-        /// the mount's back. Two spheres along the mount's spine, under the seat, joined as a
-        /// capsule, are added to the cape's colliders while riding so it drapes over the back.
-        /// They are triggers on Ignore Raycast with no rigidbody: only the cloth sees them.
+        /// The cape is MagicaCloth that only knows the rider's own body (VisEquipment.SetupCloth
+        /// hands it m_clothColliders), so it fell straight through the mount's back. A capsule
+        /// along the mount's spine, under the seat, is added to the cape's colliders while riding
+        /// so it drapes over the back. Only MagicaCloth reads it: it is not a physics collider.
         /// </summary>
         private void BlockCapeWithMount(Character mount)
         {
-            var cloths = _player.GetComponentsInChildren<Cloth>();
+            var cloths = _player.GetComponentsInChildren<MagicaCloth>();
             if (cloths.Length == 0)
             {
                 ReleaseCapeCloth();
@@ -166,25 +167,28 @@ namespace ValheimMontarias.Prefabs
             for (int i = 0; i < cloths.Length; i++)
             {
                 var cloth = cloths[i];
-                var pairs = cloth.sphereColliders;
-                if (HasBlocker(pairs))
+                var constraint = cloth.SerializeData.colliderCollisionConstraint;
+                var list = constraint.colliderList;
+                if (list != null && list.Contains(_capeBlocker))
                     continue;
 
                 var state = FindClothState(cloth);
                 if (state == null)
                 {
-                    state = new ClothState { Cloth = cloth };
+                    state = new ClothState { Cloth = cloth, OriginalMode = constraint.mode };
                     _cloths.Add(state);
                 }
-                // Taken again each time it is missing: equipping can rebuild the cape's list.
-                state.Original = pairs;
+                // Taken again each time it is missing: equipping rebuilds the cape's list.
+                state.Original = list;
 
-                int count = pairs != null ? pairs.Length : 0;
-                var withMount = new ClothSphereColliderPair[count + 1];
-                if (count > 0)
-                    pairs.CopyTo(withMount, 0);
-                withMount[count] = new ClothSphereColliderPair(_blockFront, _blockBack);
-                cloth.sphereColliders = withMount;
+                // A copy: SetupCloth may hand the cape VisEquipment's own m_clothColliders list,
+                // and adding to that one would leak the blocker into every item equipped later.
+                var withMount = list != null ? new List<ColliderComponent>(list) : new List<ColliderComponent>();
+                withMount.Add(_capeBlocker);
+                constraint.colliderList = withMount;
+                if (constraint.mode == ColliderCollisionConstraint.Mode.None)
+                    constraint.mode = ColliderCollisionConstraint.Mode.Point;
+                cloth.SetParameterChange();
             }
         }
 
@@ -192,25 +196,16 @@ namespace ValheimMontarias.Prefabs
         {
             if (_capeBlocker != null)
                 return;
-            int layer = LayerMask.NameToLayer("Ignore Raycast");
-            _capeBlocker = new GameObject("MontariasCapeBlocker");
-            if (layer >= 0) _capeBlocker.layer = layer;
-            _blockFront = CreateBlockSphere("Front", layer);
-            _blockBack = CreateBlockSphere("Back", layer);
-        }
-
-        private SphereCollider CreateBlockSphere(string name, int layer)
-        {
-            var go = new GameObject(name);
-            if (layer >= 0) go.layer = layer;
-            go.transform.SetParent(_capeBlocker.transform, false);
-            var sphere = go.AddComponent<SphereCollider>();
-            sphere.isTrigger = true;
-            return sphere;
+            var go = new GameObject("MontariasCapeBlocker");
+            _capeBlocker = go.AddComponent<MagicaCapsuleCollider>();
+            _capeBlocker.direction = MagicaCapsuleCollider.Direction.Z;
+            _capeBlocker.alignedOnCenter = true;
+            _blockerRadius = -1f;
         }
 
         /// <summary>Sized from the mount's body capsule and its configured scale, so it fits a
-        /// Neck as well as Eikthyr; the top of the spheres sits just under the seat.</summary>
+        /// Neck as well as Eikthyr; the top of the capsule sits just under the seat and it runs
+        /// from a little ahead of the seat back to the rump.</summary>
         private void PlaceCapeBlocker(Character mount)
         {
             var mountTr = mount.transform;
@@ -227,25 +222,18 @@ namespace ValheimMontarias.Prefabs
             radius = Mathf.Clamp(radius * scale, 0.2f, 1.2f);
 
             var spine = seat - up * (radius + 0.06f);
-            _blockFront.transform.position = spine + forward * (radius * 0.5f);
-            _blockBack.transform.position = spine - forward * (radius * 2.4f);
-            _blockFront.radius = radius;
-            _blockBack.radius = radius;
-        }
+            var blockerTr = _capeBlocker.transform;
+            blockerTr.SetPositionAndRotation(spine - forward * (radius * 0.95f), Quaternion.LookRotation(forward, up));
 
-        private bool HasBlocker(ClothSphereColliderPair[] pairs)
-        {
-            if (pairs == null || _blockFront == null)
-                return false;
-            for (int i = 0; i < pairs.Length; i++)
+            if (Mathf.Abs(radius - _blockerRadius) > 0.001f)
             {
-                if (pairs[i].first == _blockFront)
-                    return true;
+                _blockerRadius = radius;
+                _capeBlocker.SetSize(radius, radius, radius * 2.9f);
+                _capeBlocker.UpdateParameters();
             }
-            return false;
         }
 
-        private ClothState FindClothState(Cloth cloth)
+        private ClothState FindClothState(MagicaCloth cloth)
         {
             for (int i = 0; i < _cloths.Count; i++)
             {
@@ -260,16 +248,20 @@ namespace ValheimMontarias.Prefabs
             for (int i = 0; i < _cloths.Count; i++)
             {
                 var state = _cloths[i];
-                if (state.Cloth != null && HasBlocker(state.Cloth.sphereColliders))
-                    state.Cloth.sphereColliders = state.Original ?? new ClothSphereColliderPair[0];
+                if (state.Cloth == null)
+                    continue;
+                var constraint = state.Cloth.SerializeData.colliderCollisionConstraint;
+                if (constraint.colliderList == null || !constraint.colliderList.Contains(_capeBlocker))
+                    continue;
+                constraint.colliderList = state.Original ?? new List<ColliderComponent>();
+                constraint.mode = state.OriginalMode;
+                state.Cloth.SetParameterChange();
             }
             _cloths.Clear();
 
             if (_capeBlocker != null)
-                Destroy(_capeBlocker);
+                Destroy(_capeBlocker.gameObject);
             _capeBlocker = null;
-            _blockFront = null;
-            _blockBack = null;
         }
 
         private Transform CapeTransform(Transform transform)

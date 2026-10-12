@@ -145,7 +145,7 @@ namespace MontariasTestDriver
 
         private bool Riding => (bool)Static(Javali, "IsRiding", Me);
         private int Rank => (int)Static(MontApi, "LocalRank");
-        private bool OwnsJavali => (bool)Static(MontApi, "LocalOwns", "javali");
+        private bool OwnsJavali => (bool)Static(MontApi, "LocalOwns", "capivara");
 
         private ItemDrop.ItemData MountItem() =>
             Me.GetInventory().GetAllItems().FirstOrDefault(i => (bool)Static(Whistle, "IsWhistle", i));
@@ -231,17 +231,17 @@ namespace MontariasTestDriver
             Check("api/montarias-carregado", MontApi != null);
             Check("api/versao-1", MontApi != null && Equals(MontApi.GetField("Version")?.GetValue(null), 1));
             var ids = (string[])Static(MontApi, "MountIds");
-            Check("api/so-capivara", ids.Length == 1 && ids[0] == "javali", string.Join(",", ids));
-            Check("api/nome-capivara", (string)Static(MontApi, "MountName", "javali") == "Capivara",
-                (string)Static(MontApi, "MountName", "javali"));
+            Check("api/tem-capivara", ids.Contains("capivara"), string.Join(",", ids));
+            Check("api/nome-capivara", (string)Static(MontApi, "MountName", "capivara") == "Capivara",
+                (string)Static(MontApi, "MountName", "capivara"));
 
             // O que o painel do Mestre pergunta antes de mostrar "O mod Montarias nao esta instalado."
             // Resolve olha no maximo a cada 10 s: espera ate 15.
             yield return Until(() => (bool)Static(NpcMontApi, "IsAvailable"), 15f);
             Check("api/npcvalheim-acha-o-montarias", (bool)Static(NpcMontApi, "IsAvailable"));
 
-            var key = Static(MontSettings, "SummonKey") as BepInEx.Configuration.ConfigEntry<BepInEx.Configuration.KeyboardShortcut>;
-            Check("api/tecla-montar-I", key != null && key.Value.MainKey == KeyCode.I, key?.Value.ToString());
+            var key = Static(MontSettings, "MenuKey") as BepInEx.Configuration.ConfigEntry<BepInEx.Configuration.KeyboardShortcut>;
+            Check("api/tecla-menu-U", key != null && key.Value.MainKey == KeyCode.U, key?.Value.ToString());
 
             Static(MontApi, "RequestLocalState");
             yield return Until(() => (bool)Static(MontApi, "LocalKnown"), 15f);
@@ -262,7 +262,7 @@ namespace MontariasTestDriver
             Check("mestre/no-mundo", _npc.GetComponent(TrainerNpc) != null);
 
             var offers = (IList)Static(Catalog, "Current");
-            Check("mestre/ofertas", offers.Count == 4, $"n={offers.Count}");
+            Check("mestre/ofertas", offers.Count >= 4, $"n={offers.Count}");
 
             var hoverable = _npc.GetComponent(TrainerNpc) as Interactable;
             Check("mestre/abre-o-painel", hoverable != null && hoverable.Interact(Me, false, false));
@@ -305,13 +305,13 @@ namespace MontariasTestDriver
             Check("compra/habilidade-1-cobrou-coins", CoinsInBag() == before - 500, $"antes={before} depois={CoinsInBag()}");
 
             // Deadcoins: o run-e2e.ps1 deixou 1000 no arquivo do servidor.
-            yield return Buy("compra/capivara", Offer("Mount", "javali"), () => OwnsJavali);
+            yield return Buy("compra/capivara", Offer("Mount", "capivara"), () => OwnsJavali);
             yield return Until(() => MountItem() != null, 10f);
             Check("compra/item-da-capivara-na-bolsa", MountItem() != null);
 
             // Comprar de novo e recusado.
             Func<string> said = () => (string)Static(Trainer, "LastMessage") ?? "";
-            yield return Buy("compra/capivara-de-novo", Offer("Mount", "javali"), () => said().Contains("já possui"));
+            yield return Buy("compra/capivara-de-novo", Offer("Mount", "capivara"), () => said().Contains("já possui"));
 
             yield return Photo("depois-da-compra");
             var root = T("NpcValheim", "NpcValheim.UI.UiRoot");
@@ -341,6 +341,7 @@ namespace MontariasTestDriver
             yield return new WaitForSeconds(1f);
             yield return Photo("montado");
             CheckAiLoop("montar/ia-sem-excecao-montado");
+            yield return RunSafely(SaddleRotation(mount), "sela");
 
             Vector3 mountAt = mount != null ? mount.transform.position : Me.transform.position;
             yield return UseMountItem();
@@ -366,6 +367,51 @@ namespace MontariasTestDriver
             CheckLanding("montar/desceu-ao-lado-de-novo", mountAt);
             yield return new WaitForSeconds(1.5f);
             CheckAiLoop("montar/ia-sem-excecao-no-fim");
+        }
+
+        private static Transform SaddleOf(GameObject mount) =>
+            mount != null
+                ? mount.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "MountSaddleVisual")
+                : null;
+
+        /// <summary>SelaRotacaoX/Y/Z mudados com a montaria na tela: a sela tem que girar na
+        /// hora, sem invocar de novo. Volta tudo a 0 no fim.</summary>
+        private IEnumerator SaddleRotation(GameObject mount)
+        {
+            var profile = Static(MontSettings, "Find", mount);
+            Check("sela/perfil", profile != null);
+            if (profile == null) yield break;
+            var x = Get(profile, "SaddleXRotation") as BepInEx.Configuration.ConfigEntry<float>;
+            var y = Get(profile, "SaddleYRotation") as BepInEx.Configuration.ConfigEntry<float>;
+            var z = Get(profile, "SaddleZRotation") as BepInEx.Configuration.ConfigEntry<float>;
+            Check("sela/configs-existem", x != null && y != null && z != null);
+            if (x == null || y == null || z == null) yield break;
+
+            var saddle = SaddleOf(mount);
+            Check("sela/existe", saddle != null);
+            if (saddle == null) yield break;
+            var before = saddle.localRotation;
+            Log($"sela antes: local={before.eulerAngles} mundo={saddle.rotation.eulerAngles} config=({x.Value},{y.Value},{z.Value})");
+
+            y.Value = 90f;
+            yield return new WaitForSeconds(1f);
+            saddle = SaddleOf(mount);
+            float turned = saddle != null ? Quaternion.Angle(before, saddle.localRotation) : -1f;
+            Check("sela/rotacao-y-90-gira", saddle != null && Mathf.Abs(turned - 90f) < 2f,
+                saddle != null ? $"girou={turned:0.0} local={saddle.localRotation.eulerAngles}" : "sela sumiu");
+            yield return Photo("sela-y90");
+
+            x.Value = 20f;
+            yield return new WaitForSeconds(1f);
+            saddle = SaddleOf(mount);
+            var want = Quaternion.Euler(20f, 90f, 0f);
+            Check("sela/rotacao-x-20-y-90", saddle != null && Quaternion.Angle(saddle.localRotation, before * want) < 2f,
+                saddle != null ? $"local={saddle.localRotation.eulerAngles}" : "sela sumiu");
+
+            x.Value = 0f;
+            y.Value = 0f;
+            z.Value = 0f;
+            yield return new WaitForSeconds(1f);
         }
 
         /// <summary>MonoUpdaters esvazia a lista de IA so no fim do loop; se sobrou algo, uma

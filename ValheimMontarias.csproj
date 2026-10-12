@@ -65,6 +65,10 @@
       <HintPath>$(ValheimManaged)\UnityEngine.ClothModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="MagicaClothV2">
+      <HintPath>$(ValheimManaged)\MagicaClothV2.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="UnityEngine.ParticleSystemModule">
       <HintPath>$(ValheimManaged)\UnityEngine.ParticleSystemModule.dll</HintPath>
       <Private>false</Private>
