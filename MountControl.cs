@@ -242,6 +242,12 @@ namespace ValheimMontarias.Prefabs
 
             if (CombatLock.Block(player)) return;
 
+            if (BusyElsewhere(player))
+            {
+                player.Message(MessageHud.MessageType.Center, "Solte o que está controlando antes de invocar.");
+                return;
+            }
+
             string blocker = MountRoster.Blocker(profile);
             if (blocker != null)
             {
@@ -297,8 +303,25 @@ namespace ValheimMontarias.Prefabs
             FinishSummon(player);
         }
 
+        /// <summary>
+        /// Steering a ship (or any other doodad), sitting on a chair, in a bed: the player is
+        /// held there, so a mount would be ridden by nobody while the camera stays put.
+        /// </summary>
+        private static bool BusyElsewhere(Player player)
+        {
+            if (player == null) return false;
+            var doodad = Access.GetDoodad(player);
+            if (doodad is UnityEngine.Object doodadObj ? doodadObj : doodad != null)
+                return true;
+            if (Access.Get(player, "m_attached") is bool attached && attached)
+                return true;
+            return player.IsAttachedToShip();
+        }
+
         private static bool CastInterrupted(Player player)
         {
+            if (BusyElsewhere(player))
+                return true;
             if (Access.JumpPressed() || Access.AttackPressed() || Input.GetMouseButtonDown(0))
                 return true;
             var body = Access.Body(player);

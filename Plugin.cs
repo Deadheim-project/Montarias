@@ -16,7 +16,7 @@ namespace ValheimMontarias
     {
         public const string Guid = "com.valheimmontarias.mod";
         public const string Name = "ValheimMontarias";
-        public const string Version = "0.3.20";
+        public const string Version = "0.3.21";
 
         internal static ManualLogSource Log;
         private Harmony _harmony;
