@@ -72,6 +72,8 @@ function New-Tree([string]$dir, [switch]$Driver) {
     Copy-Item -Recurse "$Profile\core" "$dir\BepInEx\core"
     Copy-Item -Recurse "$Profile\plugins\deadheim" "$dir\BepInEx\plugins\deadheim"
     Copy-Item -Recurse "$Profile\plugins\npcs" "$dir\BepInEx\plugins\npcs"
+    # O NpcValheim depende do VipList.
+    Copy-Item -Recurse "$Profile\plugins\viplist" "$dir\BepInEx\plugins\viplist"
     Copy-Item -Recurse $montarias "$dir\BepInEx\plugins\ValheimMontarias"
     if ($Driver) { Copy-Item $driverDll "$dir\BepInEx\plugins\" }
 }

@@ -222,7 +222,7 @@ namespace ValheimMontarias.Prefabs
             var profile = MountSettings.Find(mount.gameObject);
             float scale = profile?.Scale != null ? Mathf.Clamp(profile.Scale.Value, 0.5f, 3f) : 1f;
             float radius = 0.35f;
-            if (mount.m_collider is CapsuleCollider capsule && capsule != null)
+            if (Access.Get(mount, "m_collider") is CapsuleCollider capsule && capsule != null)
                 radius = capsule.radius * Mathf.Max(Mathf.Abs(mountTr.lossyScale.x), Mathf.Abs(mountTr.lossyScale.z));
             radius = Mathf.Clamp(radius * scale, 0.2f, 1.2f);
 

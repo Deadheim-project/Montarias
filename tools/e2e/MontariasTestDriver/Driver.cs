@@ -25,7 +25,7 @@ using UnityEngine;
 namespace MontariasTestDriver
 {
     [BepInPlugin("Detalhes.MontariasTestDriver", "MontariasTestDriver", "1.0.0")]
-    [BepInDependency("Detalhes.ValheimMontarias")]
+    [BepInDependency("com.valheimmontarias.mod")]
     public class Driver : BaseUnityPlugin
     {
         internal const string CharacterName = "Montador";
@@ -340,12 +340,52 @@ namespace MontariasTestDriver
             Check("montar/capivara-existe", mount != null, mount != null ? mount.name : "");
             yield return new WaitForSeconds(1f);
             yield return Photo("montado");
+            CheckAiLoop("montar/ia-sem-excecao-montado");
 
+            Vector3 mountAt = mount != null ? mount.transform.position : Me.transform.position;
             yield return UseMountItem();
             yield return Until(() => !Riding, 10f);
             Check("montar/usou-de-novo-e-desceu", !Riding);
+            CheckLanding("montar/desceu-ao-lado", mountAt);
             yield return new WaitForSeconds(1.5f);
             Check("montar/capivara-sumiu", Static(Javali, "FindOwned", Me) as GameObject == null);
+            CheckAiLoop("montar/ia-sem-excecao-depois-de-descer");
+
+            // De novo: o bug do 0.3.15 so aparecia na segunda montaria, com a primeira
+            // destruida presa na lista de IA do jogo.
+            yield return UseMountItem();
+            yield return Until(() => Riding, 15f);
+            Check("montar/montou-de-novo", Riding);
+            mount = Static(Javali, "FindOwned", Me) as GameObject;
+            yield return new WaitForSeconds(1f);
+            CheckAiLoop("montar/ia-sem-excecao-segunda-vez");
+            mountAt = mount != null ? mount.transform.position : Me.transform.position;
+            yield return UseMountItem();
+            yield return Until(() => !Riding, 10f);
+            Check("montar/desceu-de-novo", !Riding);
+            CheckLanding("montar/desceu-ao-lado-de-novo", mountAt);
+            yield return new WaitForSeconds(1.5f);
+            CheckAiLoop("montar/ia-sem-excecao-no-fim");
+        }
+
+        /// <summary>MonoUpdaters esvazia a lista de IA so no fim do loop; se sobrou algo, uma
+        /// IA lancou excecao e o FixedUpdate de todos os personagens parou ali.</summary>
+        private void CheckAiLoop(string name)
+        {
+            var type = T("assembly_valheim", "MonoUpdaters");
+            var updaters = type != null ? UnityEngine.Object.FindObjectOfType(type) : null;
+            var list = updaters != null ? Get(updaters, "m_ai") as System.Collections.IList : null;
+            Check(name, list != null && list.Count == 0, list != null ? $"pendentes={list.Count}" : "sem MonoUpdaters.m_ai");
+        }
+
+        private void CheckLanding(string name, Vector3 mountAt)
+        {
+            var pos = Me.transform.position;
+            var flat = pos - mountAt;
+            flat.y = 0f;
+            float ground = ZoneSystem.instance != null && ZoneSystem.instance.GetSolidHeight(pos, out float h, 1000) ? h : pos.y;
+            Check(name, flat.magnitude < 6f && pos.y > ground - 0.5f,
+                $"jogador={pos} montaria={mountAt} chao={ground:0.00}");
         }
 
         private IEnumerator Combate()

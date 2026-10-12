@@ -443,10 +443,63 @@ namespace ValheimMontarias.Prefabs
 
             ClearPendingMount();
             _hidden.Clear();
+            Vector3 riderPos = player.transform.position;
             ForceUnseat(player);
+            if (mount != null)
+                LandBeside(player, mount.transform, riderPos);
             if (mount == null) return;
             mount.SetActive(false);
             QueueDespawn(mount);
+        }
+
+        /// <summary>
+        /// Getting off leaves the rider where the saddle's detach offset says. If that put
+        /// them somewhere wrong -- far from the mount (a seat or attach point that went bad),
+        /// under the ground, or not a number -- they are set down on the ground beside it.
+        /// </summary>
+        private static void LandBeside(Player player, Transform mount, Vector3 riderPos)
+        {
+            var pos = player.transform.position;
+            Vector3 mountPos = mount.position;
+            if (!IsFinite(mountPos)) mountPos = riderPos;
+            if (!IsFinite(mountPos)) return;
+
+            var offset = pos - mountPos;
+            offset.y = 0f;
+            bool far = !IsFinite(pos) || offset.magnitude > 6f;
+            float ground = GroundAt(pos);
+            bool buried = IsFinite(pos) && !float.IsNaN(ground) && pos.y < ground - 0.5f;
+            if (!far && !buried) return;
+
+            var side = mount.right;
+            side.y = 0f;
+            side = side.sqrMagnitude > 0.0001f ? side.normalized : Vector3.right;
+            var landing = mountPos + side * 1.2f;
+            float landingGround = GroundAt(landing);
+            if (!float.IsNaN(landingGround))
+                landing.y = Mathf.Max(landing.y, landingGround) + 0.2f;
+            Plugin.Log.LogWarning($"ValheimMontarias: rider left the mount at {pos}, mount at {mountPos}; set down at {landing}");
+
+            player.transform.position = landing;
+            var body = Access.Body(player);
+            if (body != null)
+            {
+                body.position = landing;
+                body.linearVelocity = Vector3.zero;
+            }
+        }
+
+        private static float GroundAt(Vector3 pos)
+        {
+            var zones = ZoneSystem.instance;
+            if (zones == null || !IsFinite(pos)) return float.NaN;
+            return zones.GetSolidHeight(pos, out float height, 1000) ? height : float.NaN;
+        }
+
+        private static bool IsFinite(Vector3 v)
+        {
+            return !float.IsNaN(v.x) && !float.IsNaN(v.y) && !float.IsNaN(v.z)
+                && !float.IsInfinity(v.x) && !float.IsInfinity(v.y) && !float.IsInfinity(v.z);
         }
 
         private static void QueueDespawn(GameObject go)
@@ -713,7 +766,8 @@ namespace ValheimMontarias.Prefabs
         /// </summary>
         public static bool DriveAI(BaseAI ai)
         {
-            var nview = ai.m_nview;
+            // BaseAI.m_nview is protected in the live assembly: reading it here throws.
+            var nview = ai.GetComponent<ZNetView>();
             if (nview == null || !nview.IsValid() || !nview.IsOwner()) return false;
 
             if (RideIntent(ai.gameObject, out var dir, out bool run))
@@ -728,7 +782,9 @@ namespace ValheimMontarias.Prefabs
             dir = Vector3.zero;
             run = false;
             var player = Player.m_localPlayer;
-            if (player == null || player.IsDead() || AdminMenu.IsOpen || !player.TakeInput()) return false;
+            if (player == null || player.IsDead() || AdminMenu.IsOpen) return false;
+            // Character.TakeInput is protected in the live assembly; go through reflection.
+            if (Access.Call(player, "TakeInput") is bool takeInput && !takeInput) return false;
             if (!TryGetRidden(player, out var ridden, out _, out _) || ridden == null || ridden.gameObject != mount)
                 return false;
             if (Access.RideStick().z < 0.5f) return false;

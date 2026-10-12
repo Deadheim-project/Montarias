@@ -382,6 +382,8 @@ namespace ValheimMontarias.Prefabs
         private static Mesh CenterMesh(Mesh src)
         {
             if (src == null) return null;
+            // Reading an unreadable mesh's vertices only logs an error and returns nothing.
+            if (!src.isReadable) return src;
             Vector3[] verts;
             try
             {
