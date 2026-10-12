@@ -181,7 +181,7 @@ namespace ValheimMontarias
                 RiderClient.Request(true);
             }
 
-            _adminProfile = adminProfile ?? _adminProfile ?? MountSettings.Javali;
+            _adminProfile = adminProfile ?? _adminProfile ?? MountSettings.Default;
             _focus ??= Selected();
             SetTab(tab);
         }
@@ -427,7 +427,7 @@ namespace ValheimMontarias
             summon.onClick.AddListener(() =>
             {
                 CloseInternal();
-                JavaliControl.TrySummonProfile(Player.m_localPlayer, profile);
+                MountControl.TrySummonProfile(Player.m_localPlayer, profile);
             });
 
             bool isSelected = profile == selected;
@@ -452,7 +452,7 @@ namespace ValheimMontarias
         }
 
         private static bool IsSummoned(MountProfile profile) =>
-            JavaliControl.FindOwned(Player.m_localPlayer, profile.IsInstance) != null;
+            MountControl.FindOwned(Player.m_localPlayer, profile.IsInstance) != null;
 
         // ---- Habilidade ----
 

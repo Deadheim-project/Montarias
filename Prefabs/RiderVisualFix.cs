@@ -43,7 +43,7 @@ namespace ValheimMontarias.Prefabs
             if (_player == null)
                 return;
 
-            if (!JavaliControl.TryGetRidden(_player, out var mount, out _, out _) || mount == null)
+            if (!MountControl.TryGetRidden(_player, out var mount, out _, out _) || mount == null)
             {
                 RestoreLegPose();
                 RestoreCape();

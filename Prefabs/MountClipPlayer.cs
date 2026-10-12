@@ -2,12 +2,12 @@ using UnityEngine;
 
 namespace ValheimMontarias.Prefabs
 {
-    internal sealed class CapybaraClipPlayer : MonoBehaviour
+    internal sealed class MountClipPlayer : MonoBehaviour
     {
         private Transform[] _bones;
-        private CapybaraSkin.Clip[] _clips;
-        private CapybaraSkin.Clip _current;
-        private CapybaraSkin.Clip _previous;
+        private MountSkin.Clip[] _clips;
+        private MountSkin.Clip _current;
+        private MountSkin.Clip _previous;
         private float _time;
         private float _blend;
         private Character _character;
@@ -18,7 +18,7 @@ namespace ValheimMontarias.Prefabs
         private Quaternion[] _prevQ;
         private Vector3[] _prevS;
 
-        public void Setup(Transform[] bones, CapybaraSkin.Clip[] clips)
+        public void Setup(Transform[] bones, MountSkin.Clip[] clips)
         {
             _bones = bones;
             _clips = clips;
@@ -54,7 +54,7 @@ namespace ValheimMontarias.Prefabs
             Apply(_current, _previous, _time, _blend);
         }
 
-        private CapybaraSkin.Clip ChooseClip()
+        private MountSkin.Clip ChooseClip()
         {
             if (_character != null && _character.IsSwimming())
                 return FindClip("swim") ?? _current;
@@ -103,7 +103,7 @@ namespace ValheimMontarias.Prefabs
             return attach.GetComponentInParent<Character>() == _character;
         }
 
-        private CapybaraSkin.Clip FindClip(string name)
+        private MountSkin.Clip FindClip(string name)
         {
             if (_clips == null) return null;
             for (int i = 0; i < _clips.Length; i++)
@@ -114,7 +114,7 @@ namespace ValheimMontarias.Prefabs
             return null;
         }
 
-        private void Apply(CapybaraSkin.Clip current, CapybaraSkin.Clip previous, float time, float blend)
+        private void Apply(MountSkin.Clip current, MountSkin.Clip previous, float time, float blend)
         {
             int boneCount = _bones.Length;
             Sample(current, time, _curT, _curQ, _curS);
@@ -150,7 +150,7 @@ namespace ValheimMontarias.Prefabs
                 Mathf.Clamp(scale.z, 0.35f, 2.5f));
         }
 
-        private static void Sample(CapybaraSkin.Clip clip, float time, Vector3[] t, Quaternion[] q, Vector3[] s)
+        private static void Sample(MountSkin.Clip clip, float time, Vector3[] t, Quaternion[] q, Vector3[] s)
         {
             int boneCount = t.Length;
             if (clip == null || clip.Frames == null || clip.Frames.Length == 0)

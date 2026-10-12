@@ -13,7 +13,7 @@ namespace ValheimMontarias.Patches
         private static bool Prefix(Hud __instance)
         {
             var player = Player.m_localPlayer;
-            if (player == null || !JavaliControl.IsRiding(player)) return true;
+            if (player == null || !MountControl.IsRiding(player)) return true;
 
             var panel = Access.Get(__instance, "m_mountPanel") as GameObject;
             if (panel != null)
@@ -34,15 +34,15 @@ namespace ValheimMontarias.Patches
         [HarmonyPostfix]
         private static void Postfix(Hud __instance)
         {
-            if (!JavaliControl.IsCasting) return;
+            if (!MountControl.IsCasting) return;
             if (__instance.m_actionBarRoot == null || __instance.m_actionProgress == null) return;
 
             __instance.m_actionBarRoot.SetActive(true);
-            __instance.m_actionProgress.SetValue(JavaliControl.CastProgress);
+            __instance.m_actionProgress.SetValue(MountControl.CastProgress);
             if (__instance.m_actionName != null)
-                __instance.m_actionName.text = string.IsNullOrEmpty(JavaliControl.CastName)
+                __instance.m_actionName.text = string.IsNullOrEmpty(MountControl.CastName)
                     ? "Invocando montaria"
-                    : $"Invocando {JavaliControl.CastName}";
+                    : $"Invocando {MountControl.CastName}";
         }
     }
 }

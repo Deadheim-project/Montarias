@@ -7,7 +7,7 @@ namespace ValheimMontarias.Prefabs
     /// Runtime clone of vanilla Boar. Mesh stays vanilla until a custom asset replaces it.
     /// Saddle collider/mesh is copied from Lox/Asksvin but hidden — we only need Sadle.
     /// </summary>
-    internal static class BoarPrefab
+    internal static class MountPrefab
     {
         public const string PrefabName = "JavaliMontaria";
         public const string DisplayName = "Capivara";
@@ -32,13 +32,13 @@ namespace ValheimMontarias.Prefabs
 
         public static void ApplyMoveSpeed(Character character)
         {
-            ApplyMoveSpeed(character, MountSettings.Find(character != null ? character.gameObject : null) ?? MountSettings.Javali);
+            ApplyMoveSpeed(character, MountSettings.Find(character != null ? character.gameObject : null) ?? MountSettings.Default);
         }
 
         public static void ApplyMoveSpeed(Character character, MountProfile profile)
         {
             if (character == null) return;
-            var mountProfile = profile ?? MountSettings.Find(character != null ? character.gameObject : null) ?? MountSettings.Javali;
+            var mountProfile = profile ?? MountSettings.Find(character != null ? character.gameObject : null) ?? MountSettings.Default;
             float walk = mountProfile != null ? mountProfile.WalkSpeed.Value : MountSettings.Walk;
             float run = mountProfile != null ? mountProfile.RunSpeed.Value : MountSettings.Run;
             float jump = mountProfile != null ? mountProfile.JumpHeight.Value : MountSettings.Jump;
@@ -63,25 +63,25 @@ namespace ValheimMontarias.Prefabs
             if (profile == null) return 1f;
             var player = Player.m_localPlayer;
             if (player == null) return 1f;
-            long owner = JavaliControl.OwnerId(go);
+            long owner = MountControl.OwnerId(go);
             return owner != 0L && owner == player.GetPlayerID() ? MountRoster.SpeedBonus : 1f;
         }
 
         public static void ApplyName(Character character)
         {
-            ApplyName(character, MountSettings.Find(character != null ? character.gameObject : null) ?? MountSettings.Javali);
+            ApplyName(character, MountSettings.Find(character != null ? character.gameObject : null) ?? MountSettings.Default);
         }
 
         public static void ApplyName(Character character, MountProfile profile)
         {
             if (character == null) return;
-            string name = profile != null ? profile.Name : (MountSettings.Javali != null ? MountSettings.Javali.Name : DisplayName);
+            string name = profile != null ? profile.Name : (MountSettings.Default != null ? MountSettings.Default.Name : DisplayName);
             Access.Set(character, "m_name", name);
         }
 
         public static void ApplyScale(GameObject go)
         {
-            ApplyScale(go, MountSettings.Find(go) ?? MountSettings.Javali);
+            ApplyScale(go, MountSettings.Find(go) ?? MountSettings.Default);
         }
 
         public static void ApplyScale(GameObject go, MountProfile profile)
@@ -104,7 +104,7 @@ namespace ValheimMontarias.Prefabs
         public static void ApplyAll(GameObject go)
         {
             if (go == null) return;
-            var profile = MountSettings.Find(go) ?? MountSettings.Javali;
+            var profile = MountSettings.Find(go) ?? MountSettings.Default;
             ApplyMoveSpeed(go.GetComponent<Character>(), profile);
             ApplyScale(go, profile);
         }
@@ -216,8 +216,8 @@ namespace ValheimMontarias.Prefabs
             }
             if (Prefab != null)
             {
-                ApplyMoveSpeed(Prefab.GetComponent<Character>(), MountSettings.Find(Prefab) ?? MountSettings.Javali);
-                ApplyScale(Prefab, MountSettings.Find(Prefab) ?? MountSettings.Javali);
+                ApplyMoveSpeed(Prefab.GetComponent<Character>(), MountSettings.Find(Prefab) ?? MountSettings.Default);
+                ApplyScale(Prefab, MountSettings.Find(Prefab) ?? MountSettings.Default);
             }
             foreach (var character in Character.GetAllCharacters())
             {
@@ -239,7 +239,7 @@ namespace ValheimMontarias.Prefabs
                 }
             }
             return go.name.StartsWith(PrefabName, StringComparison.Ordinal)
-                || go.GetComponent<JavaliControl>() != null;
+                || go.GetComponent<MountControl>() != null;
         }
 
         public static void Register(ZNetScene scene)
@@ -259,13 +259,13 @@ namespace ValheimMontarias.Prefabs
             if (scene.m_prefabs != null && scene.m_prefabs.Exists(p => p != null && p.name == profile.PrefabName))
             {
                 var existing = scene.m_prefabs.Find(p => p != null && p.name == profile.PrefabName);
-                if (profile.Id == MountSettings.Javali?.Id && Prefab == null)
+                if (profile.Id == MountSettings.Default?.Id && Prefab == null)
                     Prefab = existing;
                 ApplyMoveSpeed(existing != null ? existing.GetComponent<Character>() : null, profile);
                 return;
             }
 
-            if (profile.Id == MountSettings.Javali?.Id && Prefab != null)
+            if (profile.Id == MountSettings.Default?.Id && Prefab != null)
             {
                 Access.AddScenePrefab(scene, Prefab);
                 return;
@@ -317,9 +317,9 @@ namespace ValheimMontarias.Prefabs
                 SuppressBossEffects(clone);
 
             AttachSaddle(scene, clone, tame, character);
-            clone.AddComponent<JavaliControl>();
+            clone.AddComponent<MountControl>();
 
-            if (profile.Id == MountSettings.Javali?.Id)
+            if (profile.Id == MountSettings.Default?.Id)
                 Prefab = clone;
             Access.AddScenePrefab(scene, clone);
             Plugin.Log.LogInfo($"ValheimMontarias: mount prefab {profile.Name} registered");

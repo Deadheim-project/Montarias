@@ -9,13 +9,13 @@ namespace ValheimMontarias.Prefabs
     {
         public const string OverlayName = "CapybaraVisual";
 
-        private static CapybaraSkin _skin;
+        private static MountSkin _skin;
         private static Texture2D _albedo;
         private static bool _loggedMissing;
 
         public static void Apply(GameObject go)
         {
-            Apply(go, MountSettings.Find(go) ?? MountSettings.Javali);
+            Apply(go, MountSettings.Find(go) ?? MountSettings.Default);
         }
 
         public static void Apply(GameObject go, MountProfile profile)
@@ -59,7 +59,7 @@ namespace ValheimMontarias.Prefabs
             if (skin.Mesh != null)
                 renderer.localBounds = skin.Mesh.bounds;
 
-            var player = overlay.AddComponent<CapybaraClipPlayer>();
+            var player = overlay.AddComponent<MountClipPlayer>();
             player.Setup(bones, skin.Clips);
 
             HideVanillaMeshes(go);
@@ -84,7 +84,7 @@ namespace ValheimMontarias.Prefabs
             return null;
         }
 
-        private static Transform[] BuildBones(Transform root, CapybaraSkin skin)
+        private static Transform[] BuildBones(Transform root, MountSkin skin)
         {
             var bones = new Transform[skin.Bones.Length];
             for (int i = 0; i < skin.Bones.Length; i++)
@@ -104,7 +104,7 @@ namespace ValheimMontarias.Prefabs
             return bones;
         }
 
-        private static Transform RootBone(Transform[] bones, CapybaraSkin skin)
+        private static Transform RootBone(Transform[] bones, MountSkin skin)
         {
             for (int i = 0; i < skin.Bones.Length; i++)
             {
@@ -191,14 +191,14 @@ namespace ValheimMontarias.Prefabs
             return mat;
         }
 
-        private static CapybaraSkin Skin(MountProfile profile)
+        private static MountSkin Skin(MountProfile profile)
         {
             var assetName = ResolveAsset(profile);
             if (_skin != null && string.Equals(assetName, "capybara", System.StringComparison.OrdinalIgnoreCase)) return _skin;
             var path = AssetPath(assetName + ".skin");
             if (!File.Exists(path))
                 return null;
-            var skin = CapybaraSkin.Load(File.ReadAllBytes(path));
+            var skin = MountSkin.Load(File.ReadAllBytes(path));
             if (assetName == "capybara")
                 _skin = skin;
             return skin;

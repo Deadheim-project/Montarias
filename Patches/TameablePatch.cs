@@ -10,7 +10,7 @@ namespace ValheimMontarias.Patches
         private static bool Prefix(Tameable __instance, ref string __result)
         {
             if (!MountHub.IsOurs(__instance.gameObject)) return true;
-            __result = JavaliControl.HoverText(__instance.gameObject, Player.m_localPlayer);
+            __result = MountControl.HoverText(__instance.gameObject, Player.m_localPlayer);
             return false;
         }
     }
@@ -35,7 +35,7 @@ namespace ValheimMontarias.Patches
                 return false;
             }
 
-            if (!JavaliControl.IsOwner(__instance.gameObject, player))
+            if (!MountControl.IsOwner(__instance.gameObject, player))
             {
                 player.Message(MessageHud.MessageType.Center, "Este animal não é seu.");
                 __result = false;
@@ -44,8 +44,8 @@ namespace ValheimMontarias.Patches
 
             if (alt)
             {
-                bool follow = !JavaliControl.IsFollowing(__instance.gameObject, player);
-                JavaliControl.SetFollow(__instance.gameObject, player, follow);
+                bool follow = !MountControl.IsFollowing(__instance.gameObject, player);
+                MountControl.SetFollow(__instance.gameObject, player, follow);
                 var profile = MountSettings.Find(__instance.gameObject);
                 string label = profile != null ? profile.Name : "Montaria";
                 player.Message(MessageHud.MessageType.Center, follow ? $"{label}: seguir" : $"{label}: ficar");
@@ -60,7 +60,7 @@ namespace ValheimMontarias.Patches
                 return false;
             }
 
-            __result = JavaliControl.TryMount(__instance.gameObject, player);
+            __result = MountControl.TryMount(__instance.gameObject, player);
             return false;
         }
     }

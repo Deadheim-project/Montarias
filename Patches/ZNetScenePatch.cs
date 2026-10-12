@@ -14,14 +14,14 @@ namespace ValheimMontarias.Patches
                 if (ObjectDB.instance != null)
                     WhistleItem.RegisterItem(ObjectDB.instance);
             });
-            Try("register mounts", () => BoarPrefab.Register(__instance));
+            Try("register mounts", () => MountPrefab.Register(__instance));
             Try("register whistles", () => WhistleItem.RegisterScene(__instance));
         }
 
         [HarmonyPostfix]
         private static void Postfix(ZNetScene __instance)
         {
-            Try("finish mounts", () => BoarPrefab.Finish(__instance));
+            Try("finish mounts", () => MountPrefab.Finish(__instance));
             Try("finish whistles", () => WhistleItem.FinishScene(__instance));
         }
 

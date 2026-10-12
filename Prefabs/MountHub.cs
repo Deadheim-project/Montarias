@@ -6,18 +6,18 @@ namespace ValheimMontarias.Prefabs
     {
         public static bool IsOurs(GameObject go)
         {
-            return BoarPrefab.IsOurs(go) || MountSettings.Find(go) != null;
+            return MountPrefab.IsOurs(go) || MountSettings.Find(go) != null;
         }
 
         public static void ApplyAll(GameObject go)
         {
-            if (BoarPrefab.IsOurs(go))
-                BoarPrefab.ApplyAll(go);
+            if (MountPrefab.IsOurs(go))
+                MountPrefab.ApplyAll(go);
         }
 
         public static void FitSeat(GameObject go)
         {
-            BoarPrefab.FitSeat(go);
+            MountPrefab.FitSeat(go);
         }
 
         /// <summary>Re-applies move speed to every mount of ours, after the local rider's skill
@@ -26,14 +26,14 @@ namespace ValheimMontarias.Prefabs
         {
             foreach (var character in Character.GetAllCharacters())
             {
-                if (character != null && BoarPrefab.IsOurs(character.gameObject))
-                    BoarPrefab.ApplyMoveSpeed(character, MountSettings.Find(character.gameObject) ?? MountSettings.Javali);
+                if (character != null && MountPrefab.IsOurs(character.gameObject))
+                    MountPrefab.ApplyMoveSpeed(character, MountSettings.Find(character.gameObject) ?? MountSettings.Default);
             }
         }
 
         public static void KeepHumanScale(Player player)
         {
-            BoarPrefab.KeepHumanScale(player);
+            MountPrefab.KeepHumanScale(player);
         }
 
         public static Transform FindVisual(GameObject go)

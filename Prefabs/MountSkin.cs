@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 namespace ValheimMontarias.Prefabs
 {
-    internal sealed class CapybaraSkin
+    internal sealed class MountSkin
     {
         public struct Bone
         {
@@ -36,7 +36,7 @@ namespace ValheimMontarias.Prefabs
         public Clip[] Clips;
         public Vector3 SeatLocal;
 
-        public static CapybaraSkin Load(byte[] data)
+        public static MountSkin Load(byte[] data)
         {
             if (data == null || data.Length < 16)
                 return null;
@@ -50,7 +50,7 @@ namespace ValheimMontarias.Prefabs
                 return null;
             bool wideBones = version >= 2;
 
-            var skin = new CapybaraSkin();
+            var skin = new MountSkin();
             skin.UnityScale = reader.ReadSingle();
             int boneCount = reader.ReadInt32();
             skin.Bones = new Bone[boneCount];

@@ -16,7 +16,7 @@ namespace ValheimMontarias.Patches
         private static bool Prefix(Player __instance)
         {
             if (__instance != Player.m_localPlayer) return true;
-            return !JavaliControl.TryOverrideRideControls(__instance);
+            return !MountControl.TryOverrideRideControls(__instance);
         }
     }
 
@@ -29,7 +29,7 @@ namespace ValheimMontarias.Patches
         private static bool Prefix(Player __instance)
         {
             if (__instance != Player.m_localPlayer) return true;
-            return !JavaliControl.ShouldBlockUnseat(__instance);
+            return !MountControl.ShouldBlockUnseat(__instance);
         }
     }
 
@@ -42,7 +42,7 @@ namespace ValheimMontarias.Patches
         private static bool Prefix(Player __instance)
         {
             if (__instance != Player.m_localPlayer) return true;
-            return !JavaliControl.ShouldBlockUnseat(__instance);
+            return !MountControl.ShouldBlockUnseat(__instance);
         }
     }
 
@@ -54,7 +54,7 @@ namespace ValheimMontarias.Patches
         {
             if (!(__instance is Player player) || player != Player.m_localPlayer)
                 return true;
-            return !JavaliControl.IsRiding(player);
+            return !MountControl.IsRiding(player);
         }
     }
 
@@ -67,7 +67,7 @@ namespace ValheimMontarias.Patches
         private static bool Prefix(Humanoid __instance, ref bool __result)
         {
             if (!(__instance is Player player) || player != Player.m_localPlayer) return true;
-            if (!JavaliControl.IsRiding(player)) return true;
+            if (!MountControl.IsRiding(player)) return true;
             __result = true;
             return false;
         }
@@ -82,7 +82,7 @@ namespace ValheimMontarias.Patches
         private static bool Prefix(Player __instance, ref bool __result)
         {
             if (__instance != Player.m_localPlayer) return true;
-            if (!JavaliControl.IsRiding(__instance)) return true;
+            if (!MountControl.IsRiding(__instance)) return true;
             __result = true;
             return false;
         }

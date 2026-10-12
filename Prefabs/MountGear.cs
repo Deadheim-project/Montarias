@@ -7,6 +7,17 @@ namespace ValheimMontarias.Prefabs
     public sealed class MountSaddleAnchor : MonoBehaviour
     {
         public float SitHeight = 0.12f;
+
+        /// <summary>Set when the saddle rides a bone of the vanilla body (the Neck sways its
+        /// whole body while walking/idling): the seat is refitted after each animated frame so
+        /// the rider goes along with the saddle.</summary>
+        public GameObject FollowMount;
+
+        private void LateUpdate()
+        {
+            if (FollowMount != null)
+                MountGear.Fit(FollowMount, transform);
+        }
     }
 
     internal static class MountGear
@@ -187,7 +198,8 @@ namespace ValheimMontarias.Prefabs
             RescueAttach(mount);
             EnsureCaptured();
 
-            var existing = overlay.Find(VisualName);
+            // FindSaddle, not overlay.Find: a saddle that follows the body is under a bone.
+            var existing = FindSaddle(mount);
             if (existing != null)
                 Object.DestroyImmediate(existing.gameObject);
 
@@ -227,8 +239,44 @@ namespace ValheimMontarias.Prefabs
             renderer.sharedMaterial = configured?.Material ?? (_saddleMat != null ? _saddleMat : FallbackMat());
             renderer.shadowCastingMode = ShadowCastingMode.On;
 
-            saddle.AddComponent<MountSaddleAnchor>().SitHeight = sitHeight;
+            var anchor = saddle.AddComponent<MountSaddleAnchor>();
+            anchor.SitHeight = sitHeight;
+            if (FollowsBody(profile) && FollowBone(mount, saddle.transform))
+                anchor.FollowMount = mount;
             Fit(mount);
+        }
+
+        /// <summary>Mounts whose vanilla animation moves the whole body under a saddle that
+        /// would otherwise stay still.</summary>
+        private static bool FollowsBody(MountProfile profile)
+        {
+            return profile != null && profile.Id == "neck";
+        }
+
+        /// <summary>Moves the saddle under the body bone nearest to it, keeping where it is, so
+        /// it sways with the body. The animated bones are the vanilla SkinnedMeshRenderer's.</summary>
+        private static bool FollowBone(GameObject mount, Transform saddle)
+        {
+            Transform best = null;
+            float bestDist = float.PositiveInfinity;
+            foreach (var skin in mount.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                if (skin == null || skin.bones == null || IsSaddle(skin.transform)) continue;
+                if (skin.GetComponentInParent<Player>() != null) continue;
+                foreach (var bone in skin.bones)
+                {
+                    if (bone == null) continue;
+                    float dist = (bone.position - saddle.position).sqrMagnitude;
+                    if (dist < bestDist)
+                    {
+                        bestDist = dist;
+                        best = bone;
+                    }
+                }
+            }
+            if (best == null) return false;
+            saddle.SetParent(best, true);
+            return true;
         }
 
         private static SaddleVisual ConfiguredVisual(MountProfile profile)
@@ -287,12 +335,14 @@ namespace ValheimMontarias.Prefabs
 
         public static void Fit(GameObject mount)
         {
-            if (mount == null) return;
+            Fit(mount, FindSaddle(mount));
+        }
+
+        public static void Fit(GameObject mount, Transform saddle)
+        {
+            if (mount == null || saddle == null) return;
             var attach = RescueAttach(mount);
             if (attach == null) return;
-
-            var saddle = FindSaddle(mount);
-            if (saddle == null) return;
 
             float sit = 0.12f;
             var anchor = saddle.GetComponent<MountSaddleAnchor>();

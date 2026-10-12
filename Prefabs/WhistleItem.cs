@@ -46,7 +46,7 @@ namespace ValheimMontarias.Prefabs
             if (item?.m_shared == null) return null;
             var byPrefab = item.m_dropPrefab != null ? MountSettings.ByItem(item.m_dropPrefab.name) : null;
             if (byPrefab != null) return byPrefab;
-            return IsCapybara(item) ? MountSettings.Javali : null;
+            return IsCapybara(item) ? MountSettings.Default : null;
         }
 
         public static bool Has(Player player, MountProfile profile)

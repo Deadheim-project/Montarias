@@ -135,7 +135,7 @@ namespace MontariasTestDriver
 
         private static Type MontApi => T("ValheimMontarias", "ValheimMontarias.MontariasApi");
         private static Type MontSettings => T("ValheimMontarias", "ValheimMontarias.MountSettings");
-        private static Type Javali => T("ValheimMontarias", "ValheimMontarias.JavaliControl");
+        private static Type Control => T("ValheimMontarias", "ValheimMontarias.MountControl");
         private static Type Whistle => T("ValheimMontarias", "ValheimMontarias.Prefabs.WhistleItem");
         private static Type Combat => T("ValheimMontarias", "ValheimMontarias.CombatLock");
         private static Type NpcMontApi => T("NpcValheim", "NpcValheim.Integration.MontariasApi");
@@ -143,9 +143,9 @@ namespace MontariasTestDriver
         private static Type Trainer => T("NpcValheim", "NpcValheim.Npc.MountTrainer");
         private static Type TrainerNpc => T("NpcValheim", "NpcValheim.Npc.MountTrainerNpc");
 
-        private bool Riding => (bool)Static(Javali, "IsRiding", Me);
+        private bool Riding => (bool)Static(Control, "IsRiding", Me);
         private int Rank => (int)Static(MontApi, "LocalRank");
-        private bool OwnsJavali => (bool)Static(MontApi, "LocalOwns", "capivara");
+        private bool OwnsCapivara => (bool)Static(MontApi, "LocalOwns", "capivara");
 
         private ItemDrop.ItemData MountItem() =>
             Me.GetInventory().GetAllItems().FirstOrDefault(i => (bool)Static(Whistle, "IsWhistle", i));
@@ -245,8 +245,8 @@ namespace MontariasTestDriver
 
             Static(MontApi, "RequestLocalState");
             yield return Until(() => (bool)Static(MontApi, "LocalKnown"), 15f);
-            Check("api/ficha-do-servidor", (bool)Static(MontApi, "LocalKnown"), $"nivel={Rank} capivara={OwnsJavali}");
-            Check("api/comeca-sem-nada", Rank == 0 && !OwnsJavali);
+            Check("api/ficha-do-servidor", (bool)Static(MontApi, "LocalKnown"), $"nivel={Rank} capivara={OwnsCapivara}");
+            Check("api/comeca-sem-nada", Rank == 0 && !OwnsCapivara);
         }
 
         private IEnumerator Mestre()
@@ -290,7 +290,7 @@ namespace MontariasTestDriver
             bool sent = (bool)Static(Trainer, "RequestBuy", _npc.GetComponent(TrainerNpc), offer);
             Check(name + "/pedido-enviado", sent);
             yield return Until(granted, 20f);
-            Check(name + "/concedido", granted(), $"nivel={Rank} capivara={OwnsJavali} msg={Static(Trainer, "LastMessage")}");
+            Check(name + "/concedido", granted(), $"nivel={Rank} capivara={OwnsCapivara} msg={Static(Trainer, "LastMessage")}");
         }
 
         private IEnumerator Compra()
@@ -305,7 +305,7 @@ namespace MontariasTestDriver
             Check("compra/habilidade-1-cobrou-coins", CoinsInBag() == before - 500, $"antes={before} depois={CoinsInBag()}");
 
             // Deadcoins: o run-e2e.ps1 deixou 1000 no arquivo do servidor.
-            yield return Buy("compra/capivara", Offer("Mount", "capivara"), () => OwnsJavali);
+            yield return Buy("compra/capivara", Offer("Mount", "capivara"), () => OwnsCapivara);
             yield return Until(() => MountItem() != null, 10f);
             Check("compra/item-da-capivara-na-bolsa", MountItem() != null);
 
@@ -336,7 +336,7 @@ namespace MontariasTestDriver
             yield return UseMountItem();
             yield return Until(() => Riding, 15f);
             Check("montar/usou-o-item-e-montou", Riding);
-            var mount = Static(Javali, "FindOwned", Me) as GameObject;
+            var mount = Static(Control, "FindOwned", Me) as GameObject;
             Check("montar/capivara-existe", mount != null, mount != null ? mount.name : "");
             yield return new WaitForSeconds(1f);
             yield return Photo("montado");
@@ -349,7 +349,7 @@ namespace MontariasTestDriver
             Check("montar/usou-de-novo-e-desceu", !Riding);
             CheckLanding("montar/desceu-ao-lado", mountAt);
             yield return new WaitForSeconds(1.5f);
-            Check("montar/capivara-sumiu", Static(Javali, "FindOwned", Me) as GameObject == null);
+            Check("montar/capivara-sumiu", Static(Control, "FindOwned", Me) as GameObject == null);
             CheckAiLoop("montar/ia-sem-excecao-depois-de-descer");
 
             // De novo: o bug do 0.3.15 so aparecia na segunda montaria, com a primeira
@@ -357,7 +357,7 @@ namespace MontariasTestDriver
             yield return UseMountItem();
             yield return Until(() => Riding, 15f);
             Check("montar/montou-de-novo", Riding);
-            mount = Static(Javali, "FindOwned", Me) as GameObject;
+            mount = Static(Control, "FindOwned", Me) as GameObject;
             yield return new WaitForSeconds(1f);
             CheckAiLoop("montar/ia-sem-excecao-segunda-vez");
             mountAt = mount != null ? mount.transform.position : Me.transform.position;

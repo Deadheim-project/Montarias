@@ -92,8 +92,8 @@ O build copia a DLL e os assets para `$(ValheimPath)\BepInEx\plugins\ValheimMont
 
 ## Adicionar uma montaria nova
 
-1. Um `Prefabs/<Nome>Prefab.cs` no molde do `BoarPrefab` (clona o bicho vanilla, põe a
-   sela e um `JavaliControl`).
+1. Um `Prefabs/<Nome>Prefab.cs` no molde do `MountPrefab` (clona o bicho vanilla, põe a
+   sela e um `MountControl`).
 2. Registrar e finalizar o prefab em `Patches/ZNetScenePatch.cs`.
 3. Um `MountProfile` em `MountSettings.Init` (id, nome, ícone, valores padrão, habilidade
    mínima) e incluí-lo em `MountSettings.All`. Para vender, uma entrada

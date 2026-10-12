@@ -9,15 +9,15 @@ namespace ValheimMontarias.Prefabs
     /// destroyed the moment it has nobody on it. It is not persistent either, so it leaves
     /// with its rider when they log out.
     /// </summary>
-    public class JavaliControl : MonoBehaviour
+    public class MountControl : MonoBehaviour
     {
         public const string OwnerKey = "javali_owner";
 
         protected virtual void Start()
         {
             InitPet();
-            BoarPrefab.ApplyInfiniteStamina(gameObject);
-            BoarPrefab.ApplyAll(gameObject);
+            MountPrefab.ApplyInfiniteStamina(gameObject);
+            MountPrefab.ApplyAll(gameObject);
         }
 
         /// <summary>The process that owns the mount's ZDO (the rider) removes it the frame it
@@ -93,7 +93,7 @@ namespace ValheimMontarias.Prefabs
 
         public static GameObject FindOwned(Player player)
         {
-            return FindOwned(player, BoarPrefab.IsOurs);
+            return FindOwned(player, MountPrefab.IsOurs);
         }
 
         public static GameObject FindOwned(Player player, System.Func<GameObject, bool> isOurs)
@@ -119,8 +119,14 @@ namespace ValheimMontarias.Prefabs
         private static bool _casting;
         private static float _castStartedAt;
         private static float _castUntil;
-        private static string _castPrefab = BoarPrefab.PrefabName;
+        private static string _castPrefab = MountPrefab.PrefabName;
         private static string _castName;
+        private static float _castEmoteAt;
+
+        // Hands gesturing while the summon is cast. A one-shot emote, so it is re-fired
+        // until the cast ends; emotes go through the ZDO, so everyone nearby sees it.
+        private const string CastEmote = "comehere";
+        private const float CastEmoteEvery = 1.5f;
 
         public static bool IsCasting => _casting;
 
@@ -204,12 +210,12 @@ namespace ValheimMontarias.Prefabs
         public static void UseMountItem(Player player, ItemDrop.ItemData item)
         {
             if (player == null || player != Player.m_localPlayer) return;
-            TrySummonProfile(player, WhistleItem.ProfileOf(item) ?? MountSettings.Javali);
+            TrySummonProfile(player, WhistleItem.ProfileOf(item) ?? MountSettings.Default);
         }
 
         public static void TrySummon(Player player)
         {
-            TrySummonProfile(player, MountSettings.Javali);
+            TrySummonProfile(player, MountSettings.Default);
         }
 
         internal static void TrySummonProfile(Player player, MountProfile profile)
@@ -247,13 +253,28 @@ namespace ValheimMontarias.Prefabs
             if (_pendingDespawn != null)
                 return;
 
-            _castPrefab = string.IsNullOrEmpty(profile.PrefabName) ? BoarPrefab.PrefabName : profile.PrefabName;
+            _castPrefab = string.IsNullOrEmpty(profile.PrefabName) ? MountPrefab.PrefabName : profile.PrefabName;
             float cast = profile.CastSeconds != null ? Mathf.Max(0.1f, profile.CastSeconds.Value) : 2f;
             cast = Mathf.Max(0.1f, cast * MountRoster.CastMultiplier);
             _castName = profile.Name;
             _casting = true;
             _castStartedAt = Time.unscaledTime;
             _castUntil = Time.unscaledTime + cast;
+            _castEmoteAt = 0f;
+            TickCastEmote(player);
+        }
+
+        private static void TickCastEmote(Player player)
+        {
+            if (player == null || Time.unscaledTime < _castEmoteAt) return;
+            _castEmoteAt = Time.unscaledTime + CastEmoteEvery;
+            Access.Call(player, "StartEmote", CastEmote, true);
+        }
+
+        private static void StopCastEmote(Player player)
+        {
+            if (player == null) return;
+            Access.Call(player, "StopEmote");
         }
 
         private static void TickCast(Player player)
@@ -266,9 +287,13 @@ namespace ValheimMontarias.Prefabs
             }
 
             if (Time.unscaledTime < _castUntil)
+            {
+                TickCastEmote(player);
                 return;
+            }
 
             _casting = false;
+            StopCastEmote(player);
             FinishSummon(player);
         }
 
@@ -286,6 +311,7 @@ namespace ValheimMontarias.Prefabs
         private static void CancelCast(Player player, string message)
         {
             _casting = false;
+            StopCastEmote(player);
             if (player != null && !string.IsNullOrEmpty(message))
                 player.Message(MessageHud.MessageType.Center, message);
         }
@@ -296,9 +322,9 @@ namespace ValheimMontarias.Prefabs
             var scene = ZNetScene.instance;
             if (scene == null) return;
 
-            string prefabName = string.IsNullOrEmpty(_castPrefab) ? BoarPrefab.PrefabName : _castPrefab;
+            string prefabName = string.IsNullOrEmpty(_castPrefab) ? MountPrefab.PrefabName : _castPrefab;
             var prefab = scene.GetPrefab(prefabName)
-                ?? (prefabName == BoarPrefab.PrefabName ? BoarPrefab.Prefab : null);
+                ?? (prefabName == MountPrefab.PrefabName ? MountPrefab.Prefab : null);
             if (prefab == null)
             {
                 player.Message(MessageHud.MessageType.Center, "A montaria ainda não está pronta.");
@@ -577,7 +603,7 @@ namespace ValheimMontarias.Prefabs
             return result is bool ok && ok;
         }
 
-        public static bool TryGetRidden(Player player, out Character mount, out JavaliControl pet, out object controller)
+        public static bool TryGetRidden(Player player, out Character mount, out MountControl pet, out object controller)
         {
             mount = null;
             pet = null;
@@ -596,7 +622,7 @@ namespace ValheimMontarias.Prefabs
                 if (!ridden) continue;
 
                 mount = character;
-                pet = character.GetComponent<JavaliControl>();
+                pet = character.GetComponent<MountControl>();
                 if (controller == null)
                     controller = sadle;
                 return pet != null;
@@ -615,7 +641,7 @@ namespace ValheimMontarias.Prefabs
                 mount = null;
                 return false;
             }
-            pet = mount.GetComponent<JavaliControl>();
+            pet = mount.GetComponent<MountControl>();
             return pet != null;
         }
 

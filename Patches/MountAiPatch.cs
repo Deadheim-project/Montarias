@@ -8,7 +8,7 @@ namespace ValheimMontarias.Patches
 {
     /// <summary>
     /// Our mounts only ever exist with a rider on them, so their AI is replaced whole by
-    /// <see cref="JavaliControl.DriveAI"/>: no passive movement of their own.
+    /// <see cref="MountControl.DriveAI"/>: no passive movement of their own.
     /// </summary>
     /// <remarks>
     /// This must never throw. MonoUpdatersExtra.UpdateAI runs every AI in one loop with no
@@ -36,10 +36,10 @@ namespace ValheimMontarias.Patches
                 __result = false;
                 return false;
             }
-            if (!__instance.TryGetComponent<JavaliControl>(out _)) return true;
+            if (!__instance.TryGetComponent<MountControl>(out _)) return true;
             try
             {
-                __result = JavaliControl.DriveAI(__instance);
+                __result = MountControl.DriveAI(__instance);
             }
             catch (Exception e)
             {

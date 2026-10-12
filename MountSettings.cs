@@ -66,30 +66,30 @@ namespace ValheimMontarias
 
     internal static class MountSettings
     {
-        public static MountProfile Javali { get; private set; }
+        public static MountProfile Default { get; private set; }
         public static MountProfile[] All { get; private set; }
 
-        public static ConfigEntry<float> RunSpeed => Javali?.RunSpeed;
-        public static ConfigEntry<float> WalkSpeed => Javali?.WalkSpeed;
-        public static ConfigEntry<float> JumpHeight => Javali?.JumpHeight;
-        public static ConfigEntry<float> Scale => Javali?.Scale;
-        public static ConfigEntry<float> SeatOffset => Javali?.SeatOffset;
-        public static ConfigEntry<float> CastSeconds => Javali?.CastSeconds;
+        public static ConfigEntry<float> RunSpeed => Default?.RunSpeed;
+        public static ConfigEntry<float> WalkSpeed => Default?.WalkSpeed;
+        public static ConfigEntry<float> JumpHeight => Default?.JumpHeight;
+        public static ConfigEntry<float> Scale => Default?.Scale;
+        public static ConfigEntry<float> SeatOffset => Default?.SeatOffset;
+        public static ConfigEntry<float> CastSeconds => Default?.CastSeconds;
         public static ConfigEntry<bool> LockConfig;
         public static ConfigEntry<bool> UnlockAll;
         public static ConfigEntry<KeyboardShortcut> MenuKey;
         public static ConfigEntry<string> RidingRankList;
 
-        public static float Run => Javali != null ? Javali.RunSpeed.Value : 12f;
-        public static float Walk => Javali != null ? Javali.WalkSpeed.Value : 5.5f;
-        public static float Jump => Javali != null ? Javali.JumpHeight.Value : 8.5f;
-        public static float Size => Javali != null ? Mathf.Clamp(Javali.Scale.Value, 0.5f, 3f) : 1f;
-        public static float SeatHeightOffset => Javali != null ? Mathf.Clamp(Javali.SeatOffset.Value, -2f, 2f) : 0f;
-        public static Vector3 SeatPositionOffset => Javali != null
-            ? new Vector3(Javali.SeatXOffset.Value, 0f, Javali.SeatZOffset.Value)
+        public static float Run => Default != null ? Default.RunSpeed.Value : 12f;
+        public static float Walk => Default != null ? Default.WalkSpeed.Value : 5.5f;
+        public static float Jump => Default != null ? Default.JumpHeight.Value : 8.5f;
+        public static float Size => Default != null ? Mathf.Clamp(Default.Scale.Value, 0.5f, 3f) : 1f;
+        public static float SeatHeightOffset => Default != null ? Mathf.Clamp(Default.SeatOffset.Value, -2f, 2f) : 0f;
+        public static Vector3 SeatPositionOffset => Default != null
+            ? new Vector3(Default.SeatXOffset.Value, 0f, Default.SeatZOffset.Value)
             : Vector3.zero;
-        public static Vector3 SaddlePositionOffset => Javali != null
-            ? new Vector3(Javali.SaddleXOffset.Value, Javali.SaddleYOffset.Value, Javali.SaddleZOffset.Value)
+        public static Vector3 SaddlePositionOffset => Default != null
+            ? new Vector3(Default.SaddleXOffset.Value, Default.SaddleYOffset.Value, Default.SaddleZOffset.Value)
             : Vector3.zero;
         public static float SeatHeightOffsetFor(MountProfile profile) =>
             profile?.SeatOffset != null ? Mathf.Clamp(profile.SeatOffset.Value, -2f, 2f) : SeatHeightOffset;
@@ -105,7 +105,7 @@ namespace ValheimMontarias
             profile?.SaddleXRotation != null && profile.SaddleYRotation != null && profile.SaddleZRotation != null
                 ? Quaternion.Euler(profile.SaddleXRotation.Value, profile.SaddleYRotation.Value, profile.SaddleZRotation.Value)
                 : Quaternion.identity;
-        public static float Cast => Javali != null ? Mathf.Max(0.1f, Javali.CastSeconds.Value) : 2f;
+        public static float Cast => Default != null ? Mathf.Max(0.1f, Default.CastSeconds.Value) : 2f;
 
         public static void Init(BaseUnityPlugin plugin, ConfigSync sync)
         {
@@ -116,7 +116,7 @@ namespace ValheimMontarias
             profiles.Add(CreateProfile("boar", "Boar", "BoarMontaria", "ApitoBoar", null, "TrophyBoar"));
             profiles.Add(CreateProfile("eikthyr", "Eikthyr", "EikthyrMontaria", "ApitoEikthyr", null, "TrophyEikthyr"));
             All = profiles.ToArray();
-            Javali = All.Length > 0 ? All[0] : null;
+            Default = All.Length > 0 ? All[0] : null;
 
             foreach (var profile in All)
                 BindProfile(plugin, sync, profile, "Montaria" + profile.Id, 12f, 5.5f, 8.5f, 1f, 2f);
@@ -182,7 +182,7 @@ namespace ValheimMontarias
             MountProfile profile = null;
             profile = new MountProfile(id, defaultName,
                 go => go != null && go.name.StartsWith(prefabName, StringComparison.Ordinal),
-                () => BoarPrefab.ApplyProfile(profile));
+                () => MountPrefab.ApplyProfile(profile));
             profile.IconFile = iconFile;
             profile.IconPrefab = iconPrefab;
             profile.VisualAsset = string.IsNullOrEmpty(id)
@@ -206,7 +206,7 @@ namespace ValheimMontarias
             float run, float walk, float jump, float scale, float cast)
         {
             profile.CustomName = Bind(plugin, sync, group, "Nome", profile.DefaultName, "Nome exibido da montaria.");
-            if (profile.CustomName.Value == "Javali")
+            if (profile.CustomName.Value == "Default")
                 profile.CustomName.Value = profile.DefaultName;
             profile.RunSpeed = Bind(plugin, sync, group, "VelocidadeCorrida", run, "Velocidade de corrida da montaria.");
             profile.WalkSpeed = Bind(plugin, sync, group, "VelocidadeAndar", walk, "Velocidade de andar da montaria.");
@@ -261,7 +261,7 @@ namespace ValheimMontarias
             {
                 profile.ApplyAll();
                 if (Player.m_localPlayer != null)
-                    BoarPrefab.KeepHumanScale(Player.m_localPlayer);
+                    MountPrefab.KeepHumanScale(Player.m_localPlayer);
             };
         }
 
