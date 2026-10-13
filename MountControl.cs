@@ -838,8 +838,15 @@ namespace ValheimMontarias.Prefabs
             return true;
         }
 
+        /// <summary>Until when a mount that just took off keeps climbing on its own. Flying,
+        /// the body's velocity is set straight to the wanted one every physics step (Character.
+        /// UpdateFlying with our acceleration), so an upward kick would be gone at once.</summary>
+        private static float _climbUntil;
+        private const float TakeOffClimbSeconds = 0.8f;
+
         private static void TakeOff(Character mount)
         {
+            _climbUntil = Time.time + TakeOffClimbSeconds;
             mount.TakeOff();
             var body = Access.Body(mount);
             if (body != null)
@@ -869,6 +876,8 @@ namespace ValheimMontarias.Prefabs
                 vertical += 1f;
             if (Access.ButtonHeld("Crouch") || Access.ButtonHeld("JoyCrouch") || Input.GetKey(KeyCode.LeftControl))
                 vertical -= 1f;
+            if (Time.time < _climbUntil)
+                vertical = 1f;
 
             var look = player.GetLookDir();
             var flat = new Vector3(look.x, 0f, look.z);

@@ -142,13 +142,23 @@ namespace MontariasTestDriver
         private static Type Catalog => T("NpcValheim", "NpcValheim.Npc.MountCatalog");
         private static Type Trainer => T("NpcValheim", "NpcValheim.Npc.MountTrainer");
         private static Type TrainerNpc => T("NpcValheim", "NpcValheim.Npc.MountTrainerNpc");
+        private static Type Roster => T("ValheimMontarias", "ValheimMontarias.MountRoster");
+        private static Type PassApi => T("NpcValheim", "NpcValheim.BossPassApi");
+        private static Type PassNpc => T("NpcValheim", "NpcValheim.Npc.BossPassNpc");
+        private static Type Pass => T("NpcValheim", "NpcValheim.Npc.BossPass");
 
         private bool Riding => (bool)Static(Control, "IsRiding", Me);
         private int Rank => (int)Static(MontApi, "LocalRank");
         private bool OwnsCapivara => (bool)Static(MontApi, "LocalOwns", "capivara");
 
-        private ItemDrop.ItemData MountItem() =>
-            Me.GetInventory().GetAllItems().FirstOrDefault(i => (bool)Static(Whistle, "IsWhistle", i));
+        private ItemDrop.ItemData MountItem() => MountItem("capivara");
+
+        private ItemDrop.ItemData MountItem(string id) =>
+            Me.GetInventory().GetAllItems().FirstOrDefault(i =>
+            {
+                var profile = Static(Whistle, "ProfileOf", i);
+                return profile != null && (string)Get(profile, "Id") == id;
+            });
 
         private int CoinsInBag() =>
             Me.GetInventory().GetAllItems().Where(i => i.m_shared.m_name == "$item_coins").Sum(i => i.m_stack);
@@ -194,6 +204,8 @@ namespace MontariasTestDriver
                          ("compra", Compra),
                          ("montar", Montar),
                          ("combate", Combate),
+                         ("golpe", Golpe),
+                         ("moder", Moder),
                      })
             {
                 Log("=== " + step.Item1);
@@ -321,9 +333,9 @@ namespace MontariasTestDriver
             Check("compra/painel-fechado", !(bool)Static(root, "IsOpen"));
         }
 
-        private IEnumerator UseMountItem()
+        private IEnumerator UseMountItem(string id = "capivara")
         {
-            var item = MountItem();
+            var item = MountItem(id);
             if (item == null) yield break;
             Me.UseItem(Me.GetInventory(), item, true);
             yield return null;
@@ -466,6 +478,166 @@ namespace MontariasTestDriver
                 yield return UseMountItem();
                 yield return Until(() => !Riding, 10f);
             }
+        }
+
+        // ------------------------------------------------------------ golpe derruba
+
+        /// <summary>Tira o combate que um golpe possa ter deixado (buff e bit do Deadheim),
+        /// para poder montar de novo.</summary>
+        private void ClearCombat()
+        {
+            Me.GetSEMan().RemoveStatusEffect("DH_Combat".GetStableHashCode(), true);
+            Me.GetSEMan().RemoveStatusEffect("Combat".GetStableHashCode(), true);
+            var zdo = Me.GetComponent<ZNetView>().GetZDO();
+            int key = "dh_pvpFlags".GetStableHashCode();
+            zdo.Set(key, zdo.GetInt(key, 0) & ~16);
+        }
+
+        private static HitData Hit(HitData.HitType type, float damage)
+        {
+            var hit = new HitData { m_hitType = type };
+            hit.m_damage.m_damage = damage;
+            return hit;
+        }
+
+        private IEnumerator MountCapivara()
+        {
+            ClearCombat();
+            yield return new WaitForSeconds(0.5f);
+            yield return UseMountItem();
+            yield return Until(() => Riding, 15f);
+        }
+
+        private IEnumerator Golpe()
+        {
+            yield return MountCapivara();
+            Check("golpe/montou", Riding);
+            if (!Riding) yield break;
+
+            Me.Damage(Hit(HitData.HitType.Fall, 1f));
+            yield return new WaitForSeconds(1.5f);
+            Check("golpe/queda-nao-derruba", Riding);
+
+            Me.Damage(Hit(HitData.HitType.EnemyHit, 1f));
+            yield return Until(() => !Riding, 5f);
+            Check("golpe/golpe-no-cavaleiro-derruba", !Riding);
+            yield return new WaitForSeconds(1.5f);
+            Check("golpe/montaria-sumiu", Static(Control, "FindOwned", Me) as GameObject == null);
+
+            yield return MountCapivara();
+            Check("golpe/montou-de-novo", Riding);
+            var mount = Static(Control, "FindOwned", Me) as GameObject;
+            var body = mount != null ? mount.GetComponent<Character>() : null;
+            if (body == null) { Check("golpe/montaria", false); yield break; }
+            float health = body.GetHealth();
+            body.Damage(Hit(HitData.HitType.EnemyHit, 50f));
+            yield return null;
+            Check("golpe/montaria-nao-toma-dano", body == null || body.GetHealth() >= health,
+                body != null ? $"vida {health:0} -> {body.GetHealth():0}" : "");
+            yield return Until(() => !Riding, 5f);
+            Check("golpe/golpe-na-montaria-derruba", !Riding);
+            yield return new WaitForSeconds(1.5f);
+            CheckAiLoop("golpe/ia-sem-excecao");
+        }
+
+        // ------------------------------------------------------------------ Moder
+
+        private bool Owns(string id) => (bool)Static(MontApi, "LocalOwns", id);
+
+        private string Blocker(object profile) => (string)Static(Roster, "Blocker", profile);
+
+        private IEnumerator Moder()
+        {
+            var profile = Static(MontSettings, "ById", "moder");
+            Check("moder/perfil", profile != null);
+            if (profile == null || _npc == null) yield break;
+            Check("moder/voa", (bool)Get(profile, "Flies"));
+            Check("moder/prefab", ZNetScene.instance.GetPrefab("ModerMontaria") != null);
+            Check("moder/quatro-niveis", (int)Static(MontApi, "RankCount") == 4, $"n={Static(MontApi, "RankCount")}");
+
+            // No Mestre das Montarias: o Moder e os niveis 2 a 4.
+            yield return Buy("moder/compra", Offer("Mount", "moder"), () => Owns("moder"));
+            yield return Until(() => MountItem("moder") != null, 10f);
+            Check("moder/item-na-bolsa", MountItem("moder") != null);
+
+            string blocker = Blocker(profile);
+            Check("moder/sem-nivel-4-bloqueia", blocker != null && blocker.Contains("Montaria Voadora"), blocker);
+
+            Me.GetInventory().AddItem(ObjectDB.instance.GetItemPrefab("Coins"), 2500);
+            yield return Buy("moder/nivel-2", Offer("Skill", "2"), () => Rank == 2);
+            yield return Buy("moder/nivel-3", Offer("Skill", "3"), () => Rank == 3);
+            yield return Buy("moder/nivel-4", Offer("Skill", "4"), () => Rank == 4);
+
+            Check("moder/api-de-passe", PassApi != null);
+            yield return Until(() => { Blocker(profile); return (bool)Static(PassApi, "LocalKnown"); }, 15f);
+            blocker = Blocker(profile);
+            Check("moder/sem-passe-bloqueia", blocker != null && blocker.Contains("passe"), blocker);
+
+            // Compra o passe do Moder no Mestre dos Passes, com Deadcoins.
+            var passPrefab = ZNetScene.instance.GetPrefab("NpcValheim_BossPass");
+            Check("moder/mestre-dos-passes", passPrefab != null);
+            if (passPrefab == null) yield break;
+            var passNpc = Instantiate(passPrefab, Me.transform.position - Me.transform.forward * 2.5f, Quaternion.identity);
+            yield return Until(() => passNpc.GetComponent(PassNpc) != null && passNpc.GetComponent<ZNetView>().IsValid(), 10f);
+            yield return new WaitForSeconds(2f);
+            Static(Pass, "EndPurchase");
+            var request = PassNpc.GetMethod("RequestPass", Any);
+            bool sent = request != null && (bool)request.Invoke(passNpc.GetComponent(PassNpc), new object[] { "Dragon", "deadcoins", 2500 });
+            Check("moder/passe-pedido", sent);
+            yield return Until(() => (bool)Static(PassApi, "LocalHasPass", "Dragon"), 20f);
+            Check("moder/passe-concedido", (bool)Static(PassApi, "LocalHasPass", "Dragon"), $"msg={Static(Pass, "LastMessage")}");
+            Check("moder/liberado", Blocker(profile) == null, Blocker(profile));
+
+            var root = T("NpcValheim", "NpcValheim.UI.UiRoot");
+            var ui = root?.GetField("_instance", Any)?.GetValue(null);
+            root?.GetMethod("Close", Any)?.Invoke(ui, root.GetMethod("Close", Any).GetParameters().Length == 0 ? null : new object[] { null });
+            yield return new WaitForSeconds(1f);
+
+            // Montar.
+            ClearCombat();
+            Me.transform.position += Me.transform.forward * 8f;
+            yield return new WaitForSeconds(1f);
+            yield return UseMountItem("moder");
+            yield return Until(() => Riding, 15f);
+            Check("moder/montou", Riding);
+            var mount = Static(Control, "FindOwned", Me) as GameObject;
+            var body = mount != null ? mount.GetComponent<Character>() : null;
+            Check("moder/e-o-moder", mount != null && mount.name.StartsWith("ModerMontaria"), mount != null ? mount.name : "");
+            if (body == null) yield break;
+            Check("moder/sem-chefe", !body.m_boss && string.IsNullOrEmpty(body.m_defeatSetGlobalKey));
+            Check("moder/nasce-no-chao", !body.IsFlying());
+            yield return new WaitForSeconds(2f);
+            yield return Photo("moder-montado");
+            CheckAiLoop("moder/ia-sem-excecao-no-chao");
+
+            // Decolar (o Espaco chama MountControl.TakeOff).
+            float startY = mount.transform.position.y;
+            Static(Control, "TakeOff", body);
+            yield return new WaitForSeconds(3f);
+            float climbed = mount.transform.position.y - startY;
+            Check("moder/decolou", body.IsFlying() && climbed > 3f, $"subiu={climbed:0.0}m voando={body.IsFlying()}");
+            Check("moder/cavaleiro-junto", Riding);
+            yield return Photo("moder-voando");
+            float hoverY = mount.transform.position.y;
+            yield return new WaitForSeconds(2f);
+            float drift = mount.transform.position.y - hoverY;
+            Check("moder/paira", Mathf.Abs(drift) < 1.5f, $"variou={drift:0.00}m");
+            CheckAiLoop("moder/ia-sem-excecao-voando");
+
+            // Golpe no ar: cai.
+            float airY = Me.transform.position.y;
+            Me.Damage(Hit(HitData.HitType.EnemyHit, 1f));
+            yield return Until(() => !Riding, 5f);
+            Check("moder/golpe-no-ar-derruba", !Riding);
+            // Personagem novo tem 25 de vida; a queda nao pode matar o teste.
+            Me.SetGodMode(true);
+            yield return Until(() => Me.IsOnGround(), 15f);
+            Check("moder/caiu-no-chao", Me.IsOnGround() && Me.transform.position.y < airY - 2f,
+                $"de {airY:0.0} para {Me.transform.position.y:0.0}");
+            yield return new WaitForSeconds(1.5f);
+            Check("moder/montaria-sumiu", Static(Control, "FindOwned", Me) as GameObject == null);
+            Me.SetGodMode(false);
+            CheckAiLoop("moder/ia-sem-excecao-no-fim");
         }
     }
 }
