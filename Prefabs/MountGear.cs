@@ -15,10 +15,33 @@ namespace ValheimMontarias.Prefabs
         /// goes along with the saddle.</summary>
         public GameObject FollowMount;
 
+        /// <summary>Set for mounts whose resting pose is far from the bind pose the saddle was
+        /// placed on (the Moder lies down): a few frames after it shows, the saddle is put back
+        /// on top of the posed body (<see cref="MountGear.SitOnPosedBack"/>).</summary>
+        public bool FitToPose;
+        private int _fitAtFrame = -1;
+
         private void LateUpdate()
         {
+            if (FitToPose && FollowMount != null)
+            {
+                if (_fitAtFrame < 0) _fitAtFrame = Time.frameCount + 5;
+                else if (Time.frameCount >= _fitAtFrame && AnyRendererOn(FollowMount))
+                {
+                    FitToPose = false;
+                    MountGear.SitOnPosedBack(FollowMount, transform);
+                }
+            }
             if (FollowMount != null)
                 MountGear.Fit(FollowMount, transform);
+        }
+
+        /// <summary>The mount is born hidden; its animator may not pose it until it shows.</summary>
+        private static bool AnyRendererOn(GameObject mount)
+        {
+            foreach (var renderer in mount.GetComponentsInChildren<SkinnedMeshRenderer>())
+                if (renderer.enabled && !MountGear.IsSaddle(renderer.transform)) return true;
+            return false;
         }
     }
 
@@ -244,17 +267,107 @@ namespace ValheimMontarias.Prefabs
             var anchor = saddle.AddComponent<MountSaddleAnchor>();
             anchor.SitHeight = sitHeight;
             if (FollowBone(mount, saddle.transform))
+            {
                 anchor.FollowMount = mount;
+                anchor.FitToPose = profile != null && profile.Flies;
+            }
             Fit(mount);
         }
 
+        /// <summary>
+        /// Puts the saddle on the highest point of the posed body right around it. The saddle
+        /// was placed on the bind pose's back; a body that rests in another pose (the Moder lies
+        /// down) took it, and the rider, through itself or far above. The mesh is baked once in
+        /// its current pose; SelaOffsetY still applies on top.
+        /// </summary>
+        internal static void SitOnPosedBack(GameObject mount, Transform saddle)
+        {
+            if (mount == null || saddle == null) return;
+            var overlay = MountVisuals.Overlay(mount);
+            var root = overlay != null ? overlay : mount.transform;
+            var points = new System.Collections.Generic.List<Vector3>();
+            var baked = new Mesh();
+            try
+            {
+                foreach (var skin in root.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                {
+                    if (skin == null || skin.sharedMesh == null || IsSaddle(skin.transform)) continue;
+                    if (skin.GetComponentInParent<Player>() != null) continue;
+                    // Baked without the renderer's scale, then the renderer's full matrix: the
+                    // Moder's mesh is in centimetres under a scaled transform.
+                    skin.BakeMesh(baked, false);
+                    var vertices = baked.vertices;
+                    var toWorld = skin.transform.localToWorldMatrix;
+                    for (int i = 0; i < vertices.Length; i++)
+                        points.Add(toWorld.MultiplyPoint3x4(vertices[i]));
+                }
+            }
+            catch (System.Exception e)
+            {
+                Plugin.Log?.LogWarning($"ValheimMontarias: could not read the posed body of {mount.name}: {e.Message}");
+                return;
+            }
+            finally
+            {
+                Object.Destroy(baked);
+            }
+            if (points.Count == 0) return;
+
+            // The middle of the posed body (wings folded in or not), then the highest point of
+            // the body right around it: the top of the back.
+            var bounds = new Bounds(points[0], Vector3.zero);
+            for (int i = 1; i < points.Count; i++) bounds.Encapsulate(points[i]);
+            Vector3 center = bounds.center;
+            float radius = Mathf.Clamp(Mathf.Min(bounds.size.x, bounds.size.z) * 0.12f, 0.2f, 1.5f);
+            float top = float.NegativeInfinity;
+            for (int i = 0; i < points.Count; i++)
+            {
+                float dx = points[i].x - center.x, dz = points[i].z - center.z;
+                if (dx * dx + dz * dz <= radius * radius && points[i].y > top)
+                    top = points[i].y;
+            }
+            if (float.IsNegativeInfinity(top)) return;
+
+            var profile = MountSettings.Find(mount);
+            var offset = MountSettings.SaddlePositionOffsetFor(profile);
+            float scale = Mathf.Abs(root.lossyScale.y);
+            Vector3 before = saddle.position;
+            saddle.position = new Vector3(center.x, top, center.z) + mount.transform.TransformDirection(offset * scale);
+            // Ride the trunk bone nearest to the new place.
+            saddle.SetParent(root, true);
+            FollowBone(mount, saddle);
+            Plugin.Log?.LogInfo($"ValheimMontarias: {mount.name} saddle set on the posed back {before} -> {saddle.position} " +
+                $"(body {bounds.size}, bone {saddle.parent?.name})");
+            Fit(mount, saddle);
+        }
+
+        /// <summary>Bones a saddle must never ride: the capybara's nearest one was a front leg,
+        /// and the saddle swung with every step.</summary>
+        private static readonly string[] LimbBones =
+        {
+            "arm", "leg", "hand", "foot", "toe", "finger", "thigh", "calf", "shin", "knee",
+            "clavicle", "shoulder", "tail", "head", "jaw", "eye", "wing", "neck", "hoof", "paw"
+        };
+
+        private static bool IsLimb(Transform bone)
+        {
+            string name = bone.name;
+            for (int i = 0; i < LimbBones.Length; i++)
+                if (name.IndexOf(LimbBones[i], System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+            return false;
+        }
+
         /// <summary>Moves the saddle under the body bone nearest to it, keeping where it is, so
-        /// it sways with the body. With a custom skin (capivara) the bones are the overlay's,
+        /// it sways with the body. Only trunk bones count (no limbs, head, tail or wings); if a
+        /// body has none, the nearest of all. With a custom skin (capivara) the bones are the overlay's,
         /// since the vanilla body under it is hidden; otherwise the vanilla SkinnedMeshRenderer's.</summary>
         private static bool FollowBone(GameObject mount, Transform saddle)
         {
             Transform best = null;
             float bestDist = float.PositiveInfinity;
+            Transform anyBest = null;
+            float anyDist = float.PositiveInfinity;
             var overlay = MountVisuals.Overlay(mount);
             var root = overlay != null ? overlay : mount.transform;
             foreach (var skin in root.GetComponentsInChildren<SkinnedMeshRenderer>(true))
@@ -265,13 +378,19 @@ namespace ValheimMontarias.Prefabs
                 {
                     if (bone == null) continue;
                     float dist = (bone.position - saddle.position).sqrMagnitude;
-                    if (dist < bestDist)
+                    if (dist < anyDist)
+                    {
+                        anyDist = dist;
+                        anyBest = bone;
+                    }
+                    if (dist < bestDist && !IsLimb(bone))
                     {
                         bestDist = dist;
                         best = bone;
                     }
                 }
             }
+            if (best == null) best = anyBest;
             if (best == null) return false;
             saddle.SetParent(best, true);
             return true;

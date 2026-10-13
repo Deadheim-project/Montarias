@@ -135,7 +135,7 @@ namespace MontariasTestDriver
 
         private static Type MontApi => T("ValheimMontarias", "ValheimMontarias.MontariasApi");
         private static Type MontSettings => T("ValheimMontarias", "ValheimMontarias.MountSettings");
-        private static Type Control => T("ValheimMontarias", "ValheimMontarias.MountControl");
+        private static Type Control => T("ValheimMontarias", "ValheimMontarias.Prefabs.MountControl");
         private static Type Whistle => T("ValheimMontarias", "ValheimMontarias.Prefabs.WhistleItem");
         private static Type Combat => T("ValheimMontarias", "ValheimMontarias.CombatLock");
         private static Type NpcMontApi => T("NpcValheim", "NpcValheim.Integration.MontariasApi");
@@ -173,6 +173,21 @@ namespace MontariasTestDriver
                 if (ok) yield break;
                 yield return new WaitForSeconds(0.25f);
             }
+        }
+
+        /// <summary>Camera this far behind the player for the next photos (0 = as it was).</summary>
+        private static void CameraDistance(float distance)
+        {
+            var cam = GameCamera.instance;
+            if (cam == null) return;
+            var field = typeof(GameCamera).GetField("m_distance", Any);
+            if (field == null) return;
+            if (distance > 0f)
+            {
+                var max = typeof(GameCamera).GetField("m_maxDistance", Any);
+                if (max != null && (float)max.GetValue(cam) < distance) max.SetValue(cam, distance);
+            }
+            field.SetValue(cam, distance > 0f ? distance : 4f);
         }
 
         private IEnumerator Photo(string name)
@@ -402,23 +417,39 @@ namespace MontariasTestDriver
             var saddle = SaddleOf(mount);
             Check("sela/existe", saddle != null);
             if (saddle == null) yield break;
-            var before = saddle.localRotation;
-            Log($"sela antes: local={before.eulerAngles} mundo={saddle.rotation.eulerAngles} config=({x.Value},{y.Value},{z.Value})");
+
+            // A sela segue um osso animado: a rotacao e medida em relacao a montaria no mesmo
+            // quadro em que a config muda (a sela e refeita na hora), antes de o osso se mexer.
+            Func<Quaternion?> rel = () =>
+            {
+                var s = SaddleOf(mount);
+                return s != null ? Quaternion.Inverse(mount.transform.rotation) * s.rotation : (Quaternion?)null;
+            };
+            Func<string> where = () =>
+            {
+                var all = UnityEngine.Object.FindObjectsOfType<Transform>(true).Where(t => t.name == "MountSaddleVisual").ToList();
+                return $"selas na cena={all.Count} pais={string.Join(",", all.Select(t => t.parent != null ? t.parent.name : "-"))}";
+            };
+            y.Value = 0.5f;
+            var before = rel();
+            Log($"sela antes: rel={before?.eulerAngles} config=({x.Value},{y.Value},{z.Value})");
 
             y.Value = 90f;
+            var turnedTo = rel();
+            float turned = before.HasValue && turnedTo.HasValue ? Quaternion.Angle(before.Value, turnedTo.Value) : -1f;
+            Check("sela/rotacao-y-90-gira", turnedTo.HasValue && Mathf.Abs(turned - 89.5f) < 2f,
+                turnedTo.HasValue ? $"girou={turned:0.0}" : "sela sumiu: " + where());
             yield return new WaitForSeconds(1f);
-            saddle = SaddleOf(mount);
-            float turned = saddle != null ? Quaternion.Angle(before, saddle.localRotation) : -1f;
-            Check("sela/rotacao-y-90-gira", saddle != null && Mathf.Abs(turned - 90f) < 2f,
-                saddle != null ? $"girou={turned:0.0} local={saddle.localRotation.eulerAngles}" : "sela sumiu");
+            Check("sela/continua-la", SaddleOf(mount) != null, where());
             yield return Photo("sela-y90");
 
             x.Value = 20f;
+            var tilted = rel();
+            float tilt = turnedTo.HasValue && tilted.HasValue ? Quaternion.Angle(turnedTo.Value, tilted.Value) : -1f;
+            Check("sela/rotacao-x-20-y-90", tilted.HasValue && Mathf.Abs(tilt - 20f) < 2f,
+                tilted.HasValue ? $"inclinou={tilt:0.0}" : "sela sumiu: " + where());
             yield return new WaitForSeconds(1f);
-            saddle = SaddleOf(mount);
-            var want = Quaternion.Euler(20f, 90f, 0f);
-            Check("sela/rotacao-x-20-y-90", saddle != null && Quaternion.Angle(saddle.localRotation, before * want) < 2f,
-                saddle != null ? $"local={saddle.localRotation.eulerAngles}" : "sela sumiu");
+            Check("sela/continua-la-depois", SaddleOf(mount) != null, where());
 
             x.Value = 0f;
             y.Value = 0f;
@@ -463,12 +494,14 @@ namespace MontariasTestDriver
             var se = ObjectDB.instance.GetStatusEffect(dh);
             Check("combate/buff-do-deadheim-existe", se != null);
             if (se == null) yield break;
+            // O Deadheim sincroniza o buff e a flag com o proprio estado a cada quadro e tira o
+            // que o teste poe: o combate e marcado no mesmo quadro em que o item e usado.
             Me.GetSEMan().AddStatusEffect(dh, true);
-            yield return new WaitForSeconds(0.5f);
+            zdo.Set(key, zdo.GetInt(key, 0) | 16);
             yield return UseMountItem();
             yield return new WaitForSeconds(5f);
             Check("combate/em-combate-nao-monta", !Riding);
-            Me.GetSEMan().RemoveStatusEffect(dh, true);
+            ClearCombat();
             yield return new WaitForSeconds(0.5f);
             yield return UseMountItem();
             yield return Until(() => Riding, 15f);
@@ -595,9 +628,20 @@ namespace MontariasTestDriver
 
             // Montar.
             ClearCombat();
-            Me.transform.position += Me.transform.forward * 8f;
             yield return new WaitForSeconds(1f);
+            Func<string> state = () => $"y={Me.transform.position.y:0.00} maxAr={Get(Me, "m_maxAirAltitude"):0.00} vida={Me.GetHealth():0.0} preso={Me.IsAttached()} chao={Me.IsOnGround()}";
+            Log("moder antes de montar: " + state());
             yield return UseMountItem("moder");
+            for (int i = 0; i < 40 && !Riding; i++)
+            {
+                yield return new WaitForSeconds(0.1f);
+                Log("moder montando: " + state());
+            }
+            for (int i = 0; i < 10; i++)
+            {
+                Log("moder montado: " + state());
+                yield return new WaitForSeconds(0.1f);
+            }
             yield return Until(() => Riding, 15f);
             Check("moder/montou", Riding);
             var mount = Static(Control, "FindOwned", Me) as GameObject;
@@ -606,14 +650,18 @@ namespace MontariasTestDriver
             if (body == null) yield break;
             Check("moder/sem-chefe", !body.m_boss && string.IsNullOrEmpty(body.m_defeatSetGlobalKey));
             Check("moder/nasce-no-chao", !body.IsFlying());
+            CameraDistance(14f);
             yield return new WaitForSeconds(2f);
+            Check("moder/vivo-depois-de-montar", !Me.IsDead() && Me.GetHealth() > 20f, state());
+            float seat = Me.transform.position.y - mount.transform.position.y;
+            Check("moder/assento-nas-costas", seat > 1f && seat < 12f, $"assento {seat:0.0}m acima da raiz");
             yield return Photo("moder-montado");
             CheckAiLoop("moder/ia-sem-excecao-no-chao");
 
             // Decolar (o Espaco chama MountControl.TakeOff).
             float startY = mount.transform.position.y;
             Static(Control, "TakeOff", body);
-            yield return new WaitForSeconds(3f);
+            yield return new WaitForSeconds(6f);
             float climbed = mount.transform.position.y - startY;
             Check("moder/decolou", body.IsFlying() && climbed > 3f, $"subiu={climbed:0.0}m voando={body.IsFlying()}");
             Check("moder/cavaleiro-junto", Riding);
@@ -637,6 +685,7 @@ namespace MontariasTestDriver
             yield return new WaitForSeconds(1.5f);
             Check("moder/montaria-sumiu", Static(Control, "FindOwned", Me) as GameObject == null);
             Me.SetGodMode(false);
+            CameraDistance(0f);
             CheckAiLoop("moder/ia-sem-excecao-no-fim");
         }
     }

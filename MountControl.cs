@@ -34,6 +34,15 @@ namespace ValheimMontarias.Prefabs
             var nview = GetComponent<ZNetView>();
             if (nview == null || !nview.IsValid() || !nview.IsOwner()) return;
             if (IsRidden()) return;
+            var local = Player.m_localPlayer;
+            var sadle = GetComponentInChildren<Sadle>(true);
+            Plugin.Log.LogInfo($"ValheimMontarias: {name} has no rider, removed " +
+                $"(attached={(local != null ? Access.Get(local, "m_attached") : null)} " +
+                $"point={(local != null ? (Access.Get(local, "m_attachPoint") as Transform)?.name : null)} " +
+                $"doodad={(local != null ? Access.GetDoodad(local) : null)} " +
+                $"user={(sadle != null ? Access.Call(sadle, "GetUser") : null)} valid={(sadle != null ? Access.Call(sadle, "HaveValidUser") : null)} " +
+                $"range={(sadle != null ? Access.Get(sadle, "m_maxUseRange") : null)} " +
+                $"dist={(local != null ? Vector3.Distance(local.transform.position, transform.position) : -1f):0.0})");
             gameObject.SetActive(false);
             Despawn(gameObject);
         }
@@ -842,11 +851,16 @@ namespace ValheimMontarias.Prefabs
         /// the body's velocity is set straight to the wanted one every physics step (Character.
         /// UpdateFlying with our acceleration), so an upward kick would be gone at once.</summary>
         private static float _climbUntil;
+        /// <summary>The take-off animation holds the body still (an animator "freeze" tag:
+        /// Character.CanMove is false), so the climb starts when it lets go, or gives up.</summary>
+        private static float _climbPendingUntil;
         private const float TakeOffClimbSeconds = 0.8f;
+        private const float TakeOffAnimationLimit = 4f;
 
         private static void TakeOff(Character mount)
         {
-            _climbUntil = Time.time + TakeOffClimbSeconds;
+            _climbUntil = 0f;
+            _climbPendingUntil = Time.time + TakeOffAnimationLimit;
             mount.TakeOff();
             var body = Access.Body(mount);
             if (body != null)
@@ -865,9 +879,16 @@ namespace ValheimMontarias.Prefabs
         /// </summary>
         private static void Fly(BaseAI ai, Character mount)
         {
+            if (Time.time < _climbPendingUntil && mount.CanMove())
+            {
+                _climbPendingUntil = 0f;
+                _climbUntil = Time.time + TakeOffClimbSeconds;
+            }
+            bool climbing = Time.time < _climbUntil || Time.time < _climbPendingUntil;
             if (!RideInput(ai.gameObject, out var player, out var stick))
             {
-                mount.SetMoveDir(Vector3.zero);
+                // The take-off climb does not wait for the rider's keys.
+                mount.SetMoveDir(climbing ? Vector3.up : Vector3.zero);
                 return;
             }
 
@@ -876,7 +897,7 @@ namespace ValheimMontarias.Prefabs
                 vertical += 1f;
             if (Access.ButtonHeld("Crouch") || Access.ButtonHeld("JoyCrouch") || Input.GetKey(KeyCode.LeftControl))
                 vertical -= 1f;
-            if (Time.time < _climbUntil)
+            if (climbing)
                 vertical = 1f;
 
             var look = player.GetLookDir();

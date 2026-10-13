@@ -117,6 +117,8 @@ try {
     Set-Content -Path "$Root\server\BepInEx\config\DonationShop\$character-Steam_$steamId.json" -Value '6000' -Encoding ASCII -NoNewline
 
     $serverLog = "$Root\server-unity.log"
+    # O de uma rodada anterior ja tem "Opened Steam server": o cliente sairia cedo demais.
+    foreach ($old in @($serverLog, "$Root\client-unity.log")) { if (Test-Path $old) { Remove-Item -Force $old } }
     $env:SteamAppId = '892970'
     $argLine = "--doorstop-enabled true --doorstop-target-assembly `"$Root\server\BepInEx\core\BepInEx.Preloader.dll`" " +
                "-nographics -batchmode -name DeadheimMontTest -port $Port -world MontTest -password $Password -public 0 " +
