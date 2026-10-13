@@ -499,7 +499,10 @@ namespace ValheimMontarias.Prefabs
             Access.Set(sadle, "m_tameable", tame);
             Access.Set(sadle, "m_attachPoint", attach);
             Access.Set(sadle, "m_attachAnimation", "attach_chair");
-            Access.Set(sadle, "m_maxUseRange", 4.5f);
+            // Sadle only counts its rider while their position is this close to the mount's root:
+            // on the Moder the seat is far above it, and in flight the rider was dropped and the
+            // mount removed. Nobody else can use our mounts, so a long reach opens nothing.
+            Access.Set(sadle, "m_maxUseRange", 25f);
             Access.Set(sadle, "m_dropSaddleOnDeath", false);
             Access.Set(sadle, "m_maxStamina", InfiniteStamina);
             Access.Set(sadle, "m_runStaminaDrain", 0f);

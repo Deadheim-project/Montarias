@@ -27,6 +27,8 @@ namespace ValheimMontarias.Patches
             {
                 if (KnocksOff(__instance, mount, rider, hit))
                 {
+                    Plugin.Log.LogInfo($"ValheimMontarias: {hit.m_hitType} hit on {(mount ? "the mount" : "the rider")} " +
+                        $"from {(hit.GetAttacker() != null ? hit.GetAttacker().m_name : "nothing")}: rider knocked off");
                     MountControl.Dismount(rider);
                     rider.Message(MessageHud.MessageType.Center, "Você foi derrubado da montaria!");
                 }

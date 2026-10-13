@@ -48,8 +48,9 @@ Como no WoW, **não existe montaria vazia**:
 - Montado: **Espaço** salta, **clique** dá uma investida.
 - **Moder (voa):** **Espaço** decola e, no ar, sobe; **Ctrl** desce e, perto do chão
   firme, pousa; para frente ela vai para onde a câmera olha (subindo ou descendo junto);
-  sem tecla ela paira. Não passa de `AlturaMaximaVoo` acima do chão ou da água. Descer ou
-  ser derrubado no ar é uma queda normal, com o dano de queda do jogo.
+  sem tecla ela paira. Não passa de `AlturaMaximaVoo` acima do chão ou da água. Montado não
+  se toma dano de queda (o assento sobe e desce com o corpo); descer ou ser derrubado no ar
+  é uma queda normal, com o dano de queda do jogo.
 - **Qualquer golpe derruba:** um golpe no cavaleiro ou na montaria (monstro, jogador,
   armadilha, torre...) tira o cavaleiro de cima e a montaria some. Queda, afogamento, fogo,
   veneno e frio contínuos não derrubam; jogador com PvP desligado não é derrubado por

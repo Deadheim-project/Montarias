@@ -25,6 +25,8 @@ param(
     [string]$ServerDir = 'D:\ValheimDedicatedServer',
     [string]$ClientDir = '',
     [string]$Profile = (Join-Path $env:APPDATA 'DeadheimLauncher\profiles\Default\game\BepInEx'),
+    # NpcValheim.dll a usar no lugar da do perfil (ex.: um build que ainda nao saiu).
+    [string]$NpcDll = '',
     [int]$TimeoutMinutes = 15,
     [switch]$KeepRunning
 )
@@ -72,6 +74,7 @@ function New-Tree([string]$dir, [switch]$Driver) {
     Copy-Item -Recurse "$Profile\core" "$dir\BepInEx\core"
     Copy-Item -Recurse "$Profile\plugins\deadheim" "$dir\BepInEx\plugins\deadheim"
     Copy-Item -Recurse "$Profile\plugins\npcs" "$dir\BepInEx\plugins\npcs"
+    if ($NpcDll) { Copy-Item -Force $NpcDll "$dir\BepInEx\plugins\npcs\NpcValheim.dll" }
     # O NpcValheim depende do VipList.
     Copy-Item -Recurse "$Profile\plugins\viplist" "$dir\BepInEx\plugins\viplist"
     Copy-Item -Recurse $montarias "$dir\BepInEx\plugins\ValheimMontarias"
@@ -108,11 +111,14 @@ try {
         if (Test-Path $d) { Remove-Item -Recurse -Force $d }
         New-Item -ItemType Directory -Force $d | Out-Null
     }
-    # 1000 Deadcoins para o personagem de teste (a Capivara custa 300).
+    # Deadcoins para o personagem de teste: Capivara 300, nivel 3 500, nivel 4 1000, Moder 600,
+    # passe do Moder 2500.
     New-Item -ItemType Directory -Force "$Root\server\BepInEx\config\DonationShop" | Out-Null
-    Set-Content -Path "$Root\server\BepInEx\config\DonationShop\$character-Steam_$steamId.json" -Value '1000' -Encoding ASCII -NoNewline
+    Set-Content -Path "$Root\server\BepInEx\config\DonationShop\$character-Steam_$steamId.json" -Value '6000' -Encoding ASCII -NoNewline
 
     $serverLog = "$Root\server-unity.log"
+    # O de uma rodada anterior ja tem "Opened Steam server": o cliente sairia cedo demais.
+    foreach ($old in @($serverLog, "$Root\client-unity.log")) { if (Test-Path $old) { Remove-Item -Force $old } }
     $env:SteamAppId = '892970'
     $argLine = "--doorstop-enabled true --doorstop-target-assembly `"$Root\server\BepInEx\core\BepInEx.Preloader.dll`" " +
                "-nographics -batchmode -name DeadheimMontTest -port $Port -world MontTest -password $Password -public 0 " +
