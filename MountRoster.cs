@@ -29,7 +29,13 @@ namespace ValheimMontarias
 
         public static bool CanRide(MountProfile profile) => profile != null && Rank >= profile.MinRank;
 
-        public static bool Usable(MountProfile profile) => Owns(profile) && CanRide(profile);
+        public static bool Usable(MountProfile profile) => Owns(profile) && CanRide(profile) && BossDone(profile);
+
+        /// <summary>Whether the local player holds the boss pass the mount asks for
+        /// (<see cref="BossPassBridge"/>).</summary>
+        public static bool BossDone(MountProfile profile) => BossPassBridge.Has(profile?.Boss);
+
+        public static string BossName(MountProfile profile) => BossPassBridge.NameOf(profile?.Boss);
 
         public static bool AllowedForLocalPlayer(MountProfile profile)
         {
@@ -80,6 +86,13 @@ namespace ValheimMontarias
             if (!Owns(profile)) return $"Você não possui {profile.Name}. Procure o Mestre das Montarias.";
             if (!CanRide(profile))
                 return $"{profile.Name} exige a habilidade {RidingRanks.NameOf(profile.MinRank)}. Aprenda com o Mestre das Montarias.";
+            if (!string.IsNullOrEmpty(profile.Boss) && !BossPassBridge.Known)
+                return "Consultando os passes no servidor, tente de novo em instantes.";
+            if (!BossDone(profile))
+            {
+                BossPassBridge.Request();
+                return $"{profile.Name} exige o passe de {BossName(profile)}: derrote o chefe ou compre o passe no Mestre dos Passes.";
+            }
             return null;
         }
 

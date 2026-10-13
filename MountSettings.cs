@@ -39,7 +39,14 @@ namespace ValheimMontarias
         public ConfigEntry<float> LegSpread;
         public ConfigEntry<float> CastSeconds;
         public ConfigEntry<int> RequiredRank;
+        public ConfigEntry<string> RequiredBoss;
         public ConfigEntry<string> AllowedSteamIds;
+        public ConfigEntry<float> FlySpeed;
+        public ConfigEntry<float> FlyRunSpeed;
+
+        /// <summary>Takes off with Space and flies (the Moder). Set in code: only a body with
+        /// flying animations can do it.</summary>
+        public bool Flies;
 
         public MountProfile(string id, string defaultName, Func<GameObject, bool> isInstance, Action applyAll)
         {
@@ -62,6 +69,10 @@ namespace ValheimMontarias
 
         /// <summary>Riding skill level needed to summon it (1 = the first level).</summary>
         public int MinRank => RequiredRank != null ? Mathf.Max(1, RequiredRank.Value) : 1;
+
+        /// <summary>Boss whose pass (NpcValheim's BossPass) the rider must hold, by its creature
+        /// prefab ("Dragon"), or "" when there is none.</summary>
+        public string Boss => RequiredBoss != null ? (RequiredBoss.Value ?? "").Trim() : "";
     }
 
     internal static class MountSettings
@@ -79,6 +90,9 @@ namespace ValheimMontarias
         public static ConfigEntry<bool> UnlockAll;
         public static ConfigEntry<KeyboardShortcut> MenuKey;
         public static ConfigEntry<string> RidingRankList;
+        public static ConfigEntry<bool> KnockOffOnHit;
+        public static ConfigEntry<float> FlyMaxAltitude;
+        public static ConfigEntry<float> FlyClimbSpeed;
 
         public static float Run => Default != null ? Default.RunSpeed.Value : 12f;
         public static float Walk => Default != null ? Default.WalkSpeed.Value : 5.5f;
@@ -115,11 +129,27 @@ namespace ValheimMontarias
             profiles.Add(CreateProfile("deer", "Deer", "DeerMontaria", "ApitoDeer", null, "TrophyDeer"));
             profiles.Add(CreateProfile("boar", "Boar", "BoarMontaria", "ApitoBoar", null, "TrophyBoar"));
             profiles.Add(CreateProfile("eikthyr", "Eikthyr", "EikthyrMontaria", "ApitoEikthyr", null, "TrophyEikthyr"));
+            var moder = CreateProfile("moder", "Moder", "ModerMontaria", "ApitoModer", null, "TrophyDragonQueen");
+            moder.Flies = true;
+            profiles.Add(moder);
             All = profiles.ToArray();
             Default = All.Length > 0 ? All[0] : null;
 
             foreach (var profile in All)
-                BindProfile(plugin, sync, profile, "Montaria" + profile.Id, 12f, 5.5f, 8.5f, 1f, 2f);
+            {
+                bool flies = profile.Flies;
+                BindProfile(plugin, sync, profile, "Montaria" + profile.Id, 12f, 5.5f, 8.5f, 1f, 2f,
+                    flies ? FlightRank : 1, flies ? "Dragon" : "");
+            }
+
+            KnockOffOnHit = Bind(plugin, sync, "Geral", "DerrubarAoTomarHit", true,
+                "Qualquer golpe no cavaleiro ou na montaria (monstro, jogador, armadilha, torre...) derruba o cavaleiro, " +
+                "e a montaria some. Queda, afogamento, fogo, veneno e frio contínuos não derrubam.");
+
+            FlyMaxAltitude = Bind(plugin, sync, "Voo", "AlturaMaximaVoo", 40f,
+                "Altura máxima de voo, em metros acima do chão (ou da água).");
+            FlyClimbSpeed = Bind(plugin, sync, "Voo", "VelocidadeSubida", 1f,
+                "Quanto Espaço/Ctrl sobem e descem em relação à velocidade de voo (1 = a mesma).");
 
             LockConfig = plugin.Config.Bind("Geral", "LockConfig", true,
                 "Clientes usam a config do servidor.");
@@ -133,13 +163,16 @@ namespace ValheimMontarias
                 "A velocidade multiplica a da montaria de quem tem o nível (1 = sem bônus); " +
                 "o cast multiplica o tempo de conjuração de todas as montarias (1 = sem redução, 0.5 = metade). " +
                 "Quem vende é o Mestre das Montarias (NpcValheim).");
-            if (RidingRankList.Value == RidingRanks.OldDefault)
+            if (Array.IndexOf(RidingRanks.OldDefaults, RidingRankList.Value) >= 0)
                 RidingRankList.Value = RidingRanks.Default;
             RidingRankList.SettingChanged += (_, __) => MountHub.ApplySpeedAll();
 
             MenuKey = plugin.Config.Bind("Geral", "TeclaMenu", new KeyboardShortcut(KeyCode.U),
                 "Abre o menu de montarias.");
         }
+
+        /// <summary>The riding skill level that lets you fly: a flying mount asks for it by default.</summary>
+        public const int FlightRank = 4;
 
         public static string MenuKeyName() => MenuKey != null ? MenuKey.Value.MainKey.ToString() : "U";
 
@@ -194,6 +227,7 @@ namespace ValheimMontarias
                     "deer" => "deer",
                     "boar" => "boar",
                     "eikthyr" => "eikthyr",
+                    "moder" => "moder",
                     _ => "capybara"
                 };
             profile.PrefabName = prefabName;
@@ -203,7 +237,7 @@ namespace ValheimMontarias
 
         private static void BindProfile(
             BaseUnityPlugin plugin, ConfigSync sync, MountProfile profile, string group,
-            float run, float walk, float jump, float scale, float cast)
+            float run, float walk, float jump, float scale, float cast, int rank, string boss)
         {
             profile.CustomName = Bind(plugin, sync, group, "Nome", profile.DefaultName, "Nome exibido da montaria.");
             if (profile.CustomName.Value == "Default")
@@ -235,8 +269,19 @@ namespace ValheimMontarias
             profile.LegSpread = Bind(plugin, sync, group, "AberturaPernas", 10f,
                 "Abertura das pernas do personagem montado, em graus (0 desativa; máximo efetivo: 45).");
             profile.CastSeconds = Bind(plugin, sync, group, "CastSegundos", cast, "Tempo de conjuração para invocar.");
-            profile.RequiredRank = Bind(plugin, sync, group, "HabilidadeMinima", 1,
+            profile.RequiredRank = Bind(plugin, sync, group, "HabilidadeMinima", rank,
                 "Nível da Habilidade de Montaria exigido para invocar (1 = o primeiro nível).");
+            profile.RequiredBoss = Bind(plugin, sync, group, "PasseExigido", boss,
+                "Passe de chefe (BossPass do NpcValheim) exigido para invocar, pelo prefab do chefe como no " +
+                "[BossPass] Bosses (gd_king, Bonemass, Dragon, GoblinKing, SeekerQueen, Fader). Vazio = nenhum. " +
+                "Sem o NpcValheim vale ter ajudado a matar o chefe.");
+            if (profile.Flies)
+            {
+                profile.FlySpeed = Bind(plugin, sync, group, "VelocidadeVoo", 10f, "Velocidade de voo.");
+                profile.FlyRunSpeed = Bind(plugin, sync, group, "VelocidadeVooCorrida", 20f, "Velocidade de voo com Shift.");
+                profile.FlySpeed.SettingChanged += (_, __) => profile.ApplyAll();
+                profile.FlyRunSpeed.SettingChanged += (_, __) => profile.ApplyAll();
+            }
             if (profile.Id == "capivara")
             {
                 profile.AllowedSteamIds = Bind(plugin, sync, group, "SteamIdsLiberados", "",

@@ -2,15 +2,17 @@
 
 Mod de montarias do Deadheim para o **Valheim 1.0** (BepInEx + ServerSync, sem Jotunn).
 
-Por enquanto só existe a **Capivara**, que é a base para as próximas montarias (porco,
-Eikthyr, veado...).
+Montarias: **Capivara**, **Neck**, **Deer**, **Boar**, **Eikthyr** e **Moder**, que voa.
 
 ## Habilidade e montarias (tipo WoW)
 
 Para invocar uma montaria é preciso:
 
-1. a **Habilidade de Montaria** no nível que ela exige (`HabilidadeMinima`), e
-2. **possuir** a montaria.
+1. a **Habilidade de Montaria** no nível que ela exige (`HabilidadeMinima`),
+2. **possuir** a montaria, e
+3. se ela pedir (`PasseExigido`), o **passe do chefe** do NpcValheim (BossPass: ganho ao
+   ajudar a matar o chefe ou comprado no Mestre dos Passes). O Moder pede o passe do Moder
+   (`Dragon`). Sem o NpcValheim vale ter ajudado a matar o chefe (registro do perfil).
 
 As duas coisas são vendidas pelo NPC **Mestre das Montarias** do NpcValheim (abas
 *Treinamento* e *Montarias*), cada item na moeda que o servidor configurar (Deadcoins ou
@@ -19,8 +21,10 @@ a conjuração.
 
 Os níveis ficam em `[Habilidade] Niveis` (`nome:velocidade:cast|...`; o `cast` multiplica o
 tempo de conjuração e é opcional). O padrão é
-`Montaria Aprendiz:1:1|Montaria Experiente:1.25:0.75|Montaria Mestre:1.5:0.5`. Uma config
-ainda no padrão antigo (sem cast) é atualizada sozinha; uma editada fica como está.
+`Montaria Aprendiz:1:1|Montaria Experiente:1.25:0.75|Montaria Mestre:1.5:0.5|Montaria Voadora:1.5:0.5`.
+O nível 4, **Montaria Voadora**, é o que deixa voar: as montarias que voam exigem ele por
+padrão. Uma config ainda num padrão antigo (sem cast, ou só com 3 níveis) é atualizada
+sozinha; uma editada fica como está.
 
 ## Como usar
 
@@ -42,6 +46,14 @@ Como no WoW, **não existe montaria vazia**:
   - *Habilidade*: o seu nível e os próximos;
   - *Admin* (só admin): stats de cada montaria e a sua própria ficha no servidor.
 - Montado: **Espaço** salta, **clique** dá uma investida.
+- **Moder (voa):** **Espaço** decola e, no ar, sobe; **Ctrl** desce e, perto do chão
+  firme, pousa; para frente ela vai para onde a câmera olha (subindo ou descendo junto);
+  sem tecla ela paira. Não passa de `AlturaMaximaVoo` acima do chão ou da água. Descer ou
+  ser derrubado no ar é uma queda normal, com o dano de queda do jogo.
+- **Qualquer golpe derruba:** um golpe no cavaleiro ou na montaria (monstro, jogador,
+  armadilha, torre...) tira o cavaleiro de cima e a montaria some. Queda, afogamento, fogo,
+  veneno e frio contínuos não derrubam; jogador com PvP desligado não é derrubado por
+  jogador. A montaria em si nunca toma dano.
 - Console: `javali` abre o menu.
 - Em combate (buff `DH_Combat` do Deadheim) não dá para montar; descer sempre dá.
 
@@ -71,9 +83,11 @@ por reflexão: catálogo (montarias, níveis), o estado do jogador local e, no s
 - `[Montaria<id>]`: `Nome`, `VelocidadeCorrida`, `VelocidadeAndar`, `AlturaPulo`,
   `Escala`, `PrefabSela`, `SelaOffsetX/Y/Z`, `SelaRotacaoX/Y/Z` (graus; `Y` gira a sela
   sobre as costas), `AberturaPernas` (graus; `0` desativa), `CastSegundos`,
-  `HabilidadeMinima`.
+  `HabilidadeMinima`, `PasseExigido`; nas que voam, `VelocidadeVoo` e
+  `VelocidadeVooCorrida`.
 - `[Habilidade]`: `Niveis`.
-- `[Geral]`: `LockConfig`, `LiberarTodasGratis`, `TeclaMenu`, `TeclaInvocar`.
+- `[Voo]`: `AlturaMaximaVoo` (metros acima do chão ou da água), `VelocidadeSubida`.
+- `[Geral]`: `LockConfig`, `LiberarTodasGratis`, `DerrubarAoTomarHit`, `TeclaMenu`, `TeclaInvocar`.
 
 Servidor e clientes precisam estar na mesma versão do mod.
 

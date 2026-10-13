@@ -388,11 +388,13 @@ namespace ValheimMontarias
             float bonus = MountRoster.SpeedBonus;
             var stats = ValheimUi.CreateLabel(_journalDetail,
                 $"Habilidade exigida: {RidingRanks.NameOf(profile.MinRank)}\n" +
+                (string.IsNullOrEmpty(profile.Boss) ? "" : $"Passe exigido: {MountRoster.BossName(profile)}\n") +
+                (profile.Flies ? "Voa: Espaço decola e sobe, Ctrl desce e pousa.\n" : "") +
                 $"Velocidade: {Value(profile.RunSpeed) * bonus:0.#}" +
                 (bonus > 1.001f ? $" <color=#9a9188>(+{(bonus - 1f) * 100f:0}% da sua habilidade)</color>" : "") + "\n" +
                 $"Conjuração: {Mathf.Max(0.1f, Value(profile.CastSeconds) * MountRoster.CastMultiplier):0.#}s" +
                 (MountRoster.CastMultiplier < 0.999f ? $" <color=#9a9188>(-{(1f - MountRoster.CastMultiplier) * 100f:0}% da sua habilidade)</color>" : "") + "\n" +
-                "Use o item da montaria para montar; E ou o item para descer.",
+                "Use o item da montaria para montar; o item ou H para descer.",
                 15, ValheimUi.Beige, TextAlignmentOptions.TopLeft);
             ValheimUi.Anchor((RectTransform)stats.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(192f, -200f), new Vector2(-16f, -92f));
@@ -448,6 +450,7 @@ namespace ValheimMontarias
             if (!MountRoster.Known) return "Consultando o servidor...";
             if (!MountRoster.Owns(profile)) return "Não possui · à venda no Mestre das Montarias";
             if (!MountRoster.CanRide(profile)) return $"Exige {RidingRanks.NameOf(profile.MinRank)}";
+            if (!MountRoster.BossDone(profile)) return $"Exige o passe de {MountRoster.BossName(profile)}";
             return profile == selected ? "Selecionada · pronta" : "Pronta";
         }
 

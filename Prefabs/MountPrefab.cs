@@ -49,6 +49,11 @@ namespace ValheimMontarias.Prefabs
             Access.Set(character, "m_acceleration", 12f);
             Access.Set(character, "m_jumpForce", jump);
             Access.Set(character, "m_jumpForceForward", 1.2f);
+            if (mountProfile != null && mountProfile.Flies)
+            {
+                character.m_flySlowSpeed = (mountProfile.FlySpeed != null ? mountProfile.FlySpeed.Value : walk) * bonus;
+                character.m_flyFastSpeed = (mountProfile.FlyRunSpeed != null ? mountProfile.FlyRunSpeed.Value : run) * bonus;
+            }
             ApplyName(character, mountProfile);
         }
 
@@ -289,6 +294,9 @@ namespace ValheimMontarias.Prefabs
             Access.Set(tame, "m_commandable", true);
             Access.Set(tame, "m_startsTamed", true);
 
+            var character = clone.GetComponent<Character>();
+            bool boss = character != null && character.m_boss;
+
             var ai = clone.GetComponent<BaseAI>();
             if (ai != null)
             {
@@ -297,11 +305,12 @@ namespace ValheimMontarias.Prefabs
                 Access.Set(ai, "m_sleeping", false);
                 Access.Set(ai, "m_enableHuntPlayer", false);
                 Access.Set(ai, "m_aggravatable", false);
-                if (profile.Id == "eikthyr")
+                if (boss)
                     Access.Set(ai, "m_canBeAlerted", false);
+                // The Moder takes off and lands on its own timer; ridden, only the rider decides.
+                ai.m_randomFly = false;
             }
 
-            var character = clone.GetComponent<Character>();
             if (character != null)
             {
                 Access.Set(character, "m_isMount", true);
@@ -313,7 +322,12 @@ namespace ValheimMontarias.Prefabs
             if (procreation != null)
                 procreation.enabled = false;
 
-            if (profile.Id == "eikthyr")
+            // Born on the ground under the rider; Space takes off.
+            if (character != null)
+                character.m_flying = false;
+
+            // Eikthyr and the Moder: no boss bar, music, defeat key or roars.
+            if (boss)
                 SuppressBossEffects(clone);
 
             AttachSaddle(scene, clone, tame, character);
@@ -412,6 +426,7 @@ namespace ValheimMontarias.Prefabs
                     "deer" => "Deer",
                     "boar" => "Boar",
                     "eikthyr" => "Eikthyr",
+                    "moder" => "Dragon",
                     _ => "Boar"
                 },
                 "Boar",

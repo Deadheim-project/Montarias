@@ -22,11 +22,18 @@ namespace ValheimMontarias
     /// </summary>
     internal static class RidingRanks
     {
-        public const string Default = "Montaria Aprendiz:1:1|Montaria Experiente:1.25:0.75|Montaria Mestre:1.5:0.5";
+        /// <summary>The fourth level is the one that lets you fly (<see cref="MountSettings.FlightRank"/>):
+        /// same speed and cast as the third.</summary>
+        public const string Default =
+            "Montaria Aprendiz:1:1|Montaria Experiente:1.25:0.75|Montaria Mestre:1.5:0.5|Montaria Voadora:1.5:0.5";
 
-        /// <summary>The default before levels had a cast time; a config still on it is moved to
-        /// <see cref="Default"/>, one an admin edited is left alone.</summary>
-        public const string OldDefault = "Montaria Aprendiz:1|Montaria Experiente:1.25|Montaria Mestre:1.5";
+        /// <summary>Defaults shipped before (no cast time; then only three levels); a config still
+        /// on one of them is moved to <see cref="Default"/>, one an admin edited is left alone.</summary>
+        public static readonly string[] OldDefaults =
+        {
+            "Montaria Aprendiz:1|Montaria Experiente:1.25|Montaria Mestre:1.5",
+            "Montaria Aprendiz:1:1|Montaria Experiente:1.25:0.75|Montaria Mestre:1.5:0.5",
+        };
 
         private static string _parsedFrom;
         private static List<RidingRank> _ranks = new List<RidingRank>();

@@ -785,7 +785,17 @@ namespace ValheimMontarias.Prefabs
 
             if (Access.JumpPressed() || Input.GetKeyDown(KeyCode.Space))
             {
-                if (mount.IsOnGround())
+                var profile = MountSettings.Find(mount.gameObject);
+                if (profile != null && profile.Flies && !mount.IsFlying() && !mount.IsSwimming())
+                {
+                    // Flying is the fourth level of the skill, whatever the mount itself asks.
+                    if (MountRoster.Rank >= MountSettings.FlightRank)
+                        TakeOff(mount);
+                    else
+                        player.Message(MessageHud.MessageType.Center,
+                            $"Voar exige a habilidade {RidingRanks.NameOf(MountSettings.FlightRank)}.");
+                }
+                else if (mount.IsOnGround())
                 {
                     mount.Jump();
                     var body = Access.Body(mount);
@@ -815,11 +825,94 @@ namespace ValheimMontarias.Prefabs
             if (nview == null || !nview.IsValid() || !nview.IsOwner()) return false;
 
             WakeUp(ai, nview);
+            var character = ai.GetComponent<Character>();
+            if (character != null && character.IsFlying())
+            {
+                Fly(ai, character);
+                return true;
+            }
             if (RideIntent(ai.gameObject, out var dir, out bool run))
                 ai.MoveTowards(dir, run);
             else
                 ai.StopMoving();
             return true;
+        }
+
+        private static void TakeOff(Character mount)
+        {
+            mount.TakeOff();
+            var body = Access.Body(mount);
+            if (body != null)
+            {
+                var vel = body.linearVelocity;
+                vel.y = Mathf.Max(vel.y, 6f);
+                body.linearVelocity = vel;
+            }
+        }
+
+        /// <summary>
+        /// Flying, the Moder goes where the rider looks while forward is held (the camera's
+        /// pitch too, WoW style); Space climbs and Ctrl descends; with no key it hovers. It
+        /// never goes higher than AlturaMaximaVoo above the ground or the water, and Ctrl close
+        /// to dry ground lands it.
+        /// </summary>
+        private static void Fly(BaseAI ai, Character mount)
+        {
+            if (!RideInput(ai.gameObject, out var player, out var stick))
+            {
+                mount.SetMoveDir(Vector3.zero);
+                return;
+            }
+
+            float vertical = 0f;
+            if (Access.ButtonHeld("Jump") || Access.ButtonHeld("JoyJump") || Input.GetKey(KeyCode.Space))
+                vertical += 1f;
+            if (Access.ButtonHeld("Crouch") || Access.ButtonHeld("JoyCrouch") || Input.GetKey(KeyCode.LeftControl))
+                vertical -= 1f;
+
+            var look = player.GetLookDir();
+            var flat = new Vector3(look.x, 0f, look.z);
+            if (flat.sqrMagnitude < 0.0001f) flat = mount.transform.forward;
+            flat.Normalize();
+
+            var move = stick.z > 0.5f ? look.normalized : Vector3.zero;
+            float climb = MountSettings.FlyClimbSpeed != null ? Mathf.Clamp(MountSettings.FlyClimbSpeed.Value, 0.1f, 3f) : 1f;
+            move.y += vertical * climb;
+
+            Vector3 pos = mount.transform.position;
+            float floor = FlightFloor(pos, out bool overWater);
+            float ceiling = MountSettings.FlyMaxAltitude != null ? Mathf.Max(5f, MountSettings.FlyMaxAltitude.Value) : 40f;
+            float altitude = float.IsNaN(floor) ? 0f : pos.y - floor;
+            if (altitude >= ceiling && move.y > 0f) move.y = 0f;
+            if (altitude > ceiling + 1f) move.y = -0.5f;
+            if (move.sqrMagnitude > 1f) move.Normalize();
+
+            if (vertical < 0f && !overWater && !float.IsNaN(floor) && (altitude < 1.6f || mount.IsOnGround()))
+            {
+                mount.Land();
+                mount.SetMoveDir(Vector3.zero);
+                return;
+            }
+
+            if (stick.z > 0.5f) ai.LookTowards(flat);
+            mount.SetMoveDir(move);
+            mount.SetRun(Access.RunHeld());
+        }
+
+        /// <summary>What the Moder flies above: the ground, or the sea when that is higher.</summary>
+        private static float FlightFloor(Vector3 pos, out bool overWater)
+        {
+            overWater = false;
+            float ground = GroundAt(pos);
+            var zones = ZoneSystem.instance;
+            if (zones == null) return ground;
+            float water = zones.m_waterLevel;
+            if (float.IsNaN(ground) || ground < water)
+            {
+                overWater = true;
+                return water;
+            }
+            return ground;
         }
 
         /// <summary>
@@ -836,17 +929,25 @@ namespace ValheimMontarias.Prefabs
             nview.GetZDO()?.Set(ZDOVars.s_sleeping, false);
         }
 
-        private static bool RideIntent(GameObject mount, out Vector3 dir, out bool run)
+        /// <summary>The local player riding this mount and taking input, and their stick.</summary>
+        private static bool RideInput(GameObject mount, out Player player, out Vector3 stick)
         {
-            dir = Vector3.zero;
-            run = false;
-            var player = Player.m_localPlayer;
+            stick = Vector3.zero;
+            player = Player.m_localPlayer;
             if (player == null || player.IsDead() || AdminMenu.IsOpen) return false;
             // Character.TakeInput is protected in the live assembly; go through reflection.
             if (Access.Call(player, "TakeInput") is bool takeInput && !takeInput) return false;
             if (!TryGetRidden(player, out var ridden, out _, out _) || ridden == null || ridden.gameObject != mount)
                 return false;
-            if (Access.RideStick().z < 0.5f) return false;
+            stick = Access.RideStick();
+            return true;
+        }
+
+        private static bool RideIntent(GameObject mount, out Vector3 dir, out bool run)
+        {
+            dir = Vector3.zero;
+            run = false;
+            if (!RideInput(mount, out var player, out var stick) || stick.z < 0.5f) return false;
 
             dir = player.GetLookDir();
             dir.y = 0f;
@@ -865,7 +966,10 @@ namespace ValheimMontarias.Prefabs
             if (Access.IsAdmin())
                 return "[<color=yellow><b>E</b></color>] Ajustes da montaria (admin)\n" +
                     $"{MountSettings.MenuKeyName()} abre o menu";
-            return "E ou o item da montaria desmontam.\nMontado: Espaço salta, Shift corre mais rápido";
+            var profile = MountSettings.Find(go);
+            if (profile != null && profile.Flies)
+                return "O item da montaria ou H desmontam.\nMontado: Espaço decola e sobe, Ctrl desce e pousa, Shift voa mais rápido";
+            return "O item da montaria ou H desmontam.\nMontado: Espaço salta, Shift corre mais rápido";
         }
     }
 }
