@@ -2,144 +2,194 @@ using UnityEngine;
 
 namespace ValheimMontarias.Prefabs
 {
+    /// <summary>
+    /// Plays the clips that come inside the .skin. Idle, walk and run are blended by weight
+    /// from the body's real speed (measured from the transform, so it works for the rider,
+    /// the owner and everyone else), and walk/run share one gait phase so switching between
+    /// them never pops the legs. The cadence follows the speed.
+    /// </summary>
     internal sealed class MountClipPlayer : MonoBehaviour
     {
+        // The capybara.skin walk/run frames are stored back to front: a planted foot slides
+        // toward the head. Played in reverse they step forward.
+        private static readonly string[] ReversedClips = { "walk", "run" };
+
+        // Cadence (clip playback rate) at walk speed and at run speed. The model's own stride is
+        // about 0.4 m/s at 1x, far below the configured 5.5/12 m/s, so the rate cannot match the
+        // ground exactly without looking frantic; these keep a natural step frequency.
+        private const float WalkCadence = 1.6f;
+        private const float RunCadence = 2.6f;
+        private const float StrideSpeed = 0.4f;
+        private const float WeightRate = 4f;
+
         private Transform[] _bones;
-        private MountSkin.Clip[] _clips;
-        private MountSkin.Clip _current;
-        private MountSkin.Clip _previous;
-        private float _time;
-        private float _blend;
+        private MountSkin.Clip _idle, _walk, _run, _swim;
+        private float _wIdle = 1f, _wWalk, _wRun, _wSwim;
+        private float _idleTime, _swimTime, _gaitPhase;
+        private float _speed, _yawRate;
+        private Vector3 _lastPos;
+        private float _lastYaw;
+        private bool _hasLast;
         private Character _character;
-        private Vector3[] _curT;
-        private Quaternion[] _curQ;
-        private Vector3[] _curS;
-        private Vector3[] _prevT;
-        private Quaternion[] _prevQ;
-        private Vector3[] _prevS;
+        private Vector3[] _accT, _t;
+        private Quaternion[] _accQ, _q;
+        private Vector3[] _accS, _s;
 
         public void Setup(Transform[] bones, MountSkin.Clip[] clips)
         {
             _bones = bones;
-            _clips = clips;
-            _current = FindClip("idle") ?? (clips != null && clips.Length > 0 ? clips[0] : null);
-            _previous = _current;
+            _idle = FindClip(clips, "idle") ?? (clips != null && clips.Length > 0 ? clips[0] : null);
+            _walk = FindClip(clips, "walk");
+            _run = FindClip(clips, "run") ?? _walk;
+            _swim = FindClip(clips, "swim");
             _character = GetComponentInParent<Character>();
             int n = bones != null ? bones.Length : 0;
-            _curT = new Vector3[n];
-            _curQ = new Quaternion[n];
-            _curS = new Vector3[n];
-            _prevT = new Vector3[n];
-            _prevQ = new Quaternion[n];
-            _prevS = new Vector3[n];
+            _accT = new Vector3[n]; _t = new Vector3[n];
+            _accQ = new Quaternion[n]; _q = new Quaternion[n];
+            _accS = new Vector3[n]; _s = new Vector3[n];
         }
 
         private void LateUpdate()
         {
-            if (_bones == null || _current == null) return;
+            if (_bones == null || _idle == null) return;
             if (_character == null)
                 _character = GetComponentInParent<Character>();
+            float dt = Time.deltaTime;
+            if (dt <= 0f) return;
 
-            var wanted = ChooseClip();
-            if (wanted != null && wanted != _current)
+            MeasureMotion(dt);
+            float walk = Mathf.Max(0.5f, ReadSpeed("m_walkSpeed", MountSettings.Walk));
+            float run = Mathf.Max(walk + 0.5f, ReadSpeed("m_runSpeed", MountSettings.Run));
+            float abs = Mathf.Abs(_speed);
+            bool swimming = _character != null && _character.IsSwimming() && _swim != null;
+            bool turning = Mathf.Abs(_yawRate) > 45f;
+
+            // Target weights.
+            float move = swimming ? 0f : Mathf.Clamp01(Mathf.InverseLerp(0.2f, 1.2f, abs));
+            if (!swimming && turning) move = Mathf.Max(move, 0.6f);
+            float runMix = _walk == null ? 0f : Mathf.Clamp01(Mathf.InverseLerp(walk * 1.1f, run * 0.85f, abs));
+            if (_walk == null) move = 0f;
+            float k = dt * WeightRate;
+            _wSwim = Mathf.MoveTowards(_wSwim, swimming ? 1f : 0f, k);
+            _wWalk = Mathf.MoveTowards(_wWalk, move * (1f - runMix), k);
+            _wRun = Mathf.MoveTowards(_wRun, move * runMix, k);
+            _wIdle = Mathf.MoveTowards(_wIdle, swimming ? 0f : 1f - move, k);
+
+            // Clocks.
+            _idleTime += dt;
+            _swimTime += dt;
+            if (_walk != null)
             {
-                _previous = _current;
-                _current = wanted;
-                _blend = 0f;
-                _time = 0f;
+                float rate = Cadence(abs, walk, run);
+                if (turning && rate < 0.7f) rate = 0.7f;
+                if (_speed < -0.2f) rate = -rate;
+                float cycle = Mathf.Lerp(CycleLength(_walk), CycleLength(_run), runMix);
+                _gaitPhase = Mathf.Repeat(_gaitPhase + dt * rate / cycle, 1f);
             }
 
-            _time += Time.deltaTime;
-            _blend = Mathf.MoveTowards(_blend, 1f, Time.deltaTime * 6f);
-            Apply(_current, _previous, _time, _blend);
+            Pose();
         }
 
-        private MountSkin.Clip ChooseClip()
+        /// <summary>Real cadence at a crawl (feet stick), the natural curve above it.</summary>
+        private static float Cadence(float speed, float walk, float run)
         {
-            if (_character != null && _character.IsSwimming())
-                return FindClip("swim") ?? _current;
+            float natural = WalkCadence * Mathf.Pow(Mathf.Max(0f, speed) / walk, 0.6f);
+            if (speed > walk)
+                natural = Mathf.Lerp(WalkCadence, RunCadence, Mathf.InverseLerp(walk, run, speed));
+            return Mathf.Min(speed / StrideSpeed, natural);
+        }
 
-            if (IsLocalRider())
+        private void MeasureMotion(float dt)
+        {
+            var root = _character != null ? _character.transform : transform;
+            Vector3 pos = root.position;
+            float yaw = root.eulerAngles.y;
+            if (_hasLast)
             {
-                Vector3 stick = Access.RideStick();
-                if (Mathf.Abs(stick.z) < 0.15f)
-                    return FindClip("idle") ?? _current;
-                if (Access.RunHeld())
-                    return FindClip("run") ?? FindClip("walk") ?? _current;
-                return FindClip("walk") ?? _current;
+                Vector3 delta = pos - _lastPos;
+                delta.y = 0f;
+                float forward = Vector3.Dot(delta, root.forward) / dt;
+                if (delta.sqrMagnitude > 25f) forward = 0f; // teleport
+                float yawRate = Mathf.DeltaAngle(_lastYaw, yaw) / dt;
+                float s = 1f - Mathf.Exp(-dt * 10f);
+                _speed = Mathf.Lerp(_speed, forward, s);
+                _yawRate = Mathf.Lerp(_yawRate, yawRate, s);
             }
-
-            float walk = WalkSpeed();
-            float speed = HorizontalSpeed();
-            if (speed < 0.35f)
-                return FindClip("idle") ?? _current;
-            if (speed < Mathf.Max(3.5f, walk * 0.9f))
-                return FindClip("walk") ?? _current;
-            return FindClip("run") ?? FindClip("walk") ?? _current;
+            _lastPos = pos;
+            _lastYaw = yaw;
+            _hasLast = true;
         }
 
-        private float WalkSpeed()
+        private float ReadSpeed(string field, float fallback)
         {
-            if (_character == null) return MountSettings.Walk;
-            var value = Access.Get(_character, "m_walkSpeed");
-            if (value is float speed && speed > 0.1f)
-                return speed;
-            return MountSettings.Walk;
+            if (_character == null) return fallback;
+            var value = Access.Get(_character, field);
+            return value is float speed && speed > 0.1f ? speed : fallback;
         }
 
-        private float HorizontalSpeed()
+        private void Pose()
         {
-            if (_character == null) return 0f;
-            Vector3 vel = _character.GetVelocity();
-            return new Vector3(vel.x, 0f, vel.z).magnitude;
-        }
+            float total = 0f;
+            Accumulate(_idle, _idleTime / Mathf.Max(0.001f, CycleLength(_idle)), _wIdle, ref total);
+            Accumulate(_walk, _gaitPhase, _wWalk, ref total);
+            if (_run != _walk)
+                Accumulate(_run, _gaitPhase, _wRun, ref total);
+            else
+                Accumulate(_walk, _gaitPhase, _wRun, ref total);
+            Accumulate(_swim, _swimTime / Mathf.Max(0.001f, CycleLength(_swim)), _wSwim, ref total);
+            if (total <= 0.0001f) return;
 
-        private bool IsLocalRider()
-        {
-            var player = Player.m_localPlayer;
-            if (player == null || _character == null) return false;
-            var attach = player.transform.parent;
-            if (attach == null) return false;
-            return attach.GetComponentInParent<Character>() == _character;
-        }
-
-        private MountSkin.Clip FindClip(string name)
-        {
-            if (_clips == null) return null;
-            for (int i = 0; i < _clips.Length; i++)
-            {
-                if (_clips[i] != null && _clips[i].Name == name)
-                    return _clips[i];
-            }
-            return null;
-        }
-
-        private void Apply(MountSkin.Clip current, MountSkin.Clip previous, float time, float blend)
-        {
-            int boneCount = _bones.Length;
-            Sample(current, time, _curT, _curQ, _curS);
-            if (previous != null && previous != current && blend < 0.999f)
-            {
-                Sample(previous, time, _prevT, _prevQ, _prevS);
-                for (int i = 0; i < boneCount; i++)
-                {
-                    var bone = _bones[i];
-                    if (bone == null) continue;
-                    bone.localPosition = Vector3.Lerp(_prevT[i], _curT[i], blend);
-                    bone.localRotation = Quaternion.Slerp(_prevQ[i], _curQ[i], blend);
-                    bone.localScale = ClampScale(Vector3.Lerp(_prevS[i], _curS[i], blend));
-                }
-                return;
-            }
-
-            for (int i = 0; i < boneCount; i++)
+            for (int i = 0; i < _bones.Length; i++)
             {
                 var bone = _bones[i];
                 if (bone == null) continue;
-                bone.localPosition = _curT[i];
-                bone.localRotation = _curQ[i];
-                bone.localScale = ClampScale(_curS[i]);
+                bone.localPosition = _accT[i] / total;
+                bone.localRotation = _accQ[i];
+                bone.localScale = ClampScale(_accS[i] / total);
             }
+        }
+
+        private void Accumulate(MountSkin.Clip clip, float phase, float weight, ref float total)
+        {
+            if (clip == null || weight <= 0.001f || clip.Frames == null || clip.Frames.Length == 0) return;
+            if (System.Array.IndexOf(ReversedClips, clip.Name) >= 0)
+                phase = 1f - Mathf.Repeat(phase, 1f);
+            Sample(clip, phase, _t, _q, _s);
+            float before = total;
+            total += weight;
+            float u = weight / total;
+            for (int i = 0; i < _bones.Length; i++)
+            {
+                if (before <= 0f)
+                {
+                    _accT[i] = _t[i] * weight;
+                    _accQ[i] = _q[i];
+                    _accS[i] = _s[i] * weight;
+                    continue;
+                }
+                _accT[i] += _t[i] * weight;
+                _accS[i] += _s[i] * weight;
+                _accQ[i] = Quaternion.Slerp(_accQ[i], _q[i], u);
+            }
+        }
+
+        /// <summary>One loop: the frames plus the step from the last back to the first.</summary>
+        private static float CycleLength(MountSkin.Clip clip)
+        {
+            if (clip == null || clip.Frames == null || clip.Frames.Length < 2) return 1f;
+            float step = Mathf.Max(0.001f, clip.Duration) / (clip.Frames.Length - 1);
+            return step * clip.Frames.Length;
+        }
+
+        private static MountSkin.Clip FindClip(MountSkin.Clip[] clips, string name)
+        {
+            if (clips == null) return null;
+            for (int i = 0; i < clips.Length; i++)
+            {
+                if (clips[i] != null && clips[i].Name == name)
+                    return clips[i];
+            }
+            return null;
         }
 
         private static Vector3 ClampScale(Vector3 scale)
@@ -150,21 +200,18 @@ namespace ValheimMontarias.Prefabs
                 Mathf.Clamp(scale.z, 0.35f, 2.5f));
         }
 
-        private static void Sample(MountSkin.Clip clip, float time, Vector3[] t, Quaternion[] q, Vector3[] s)
+        /// <summary>Samples at a 0..1 phase, wrapping the last frame into the first so the
+        /// loop has no hold or jump of a whole frame at the seam.</summary>
+        private static void Sample(MountSkin.Clip clip, float phase, Vector3[] t, Quaternion[] q, Vector3[] s)
         {
-            int boneCount = t.Length;
-            if (clip == null || clip.Frames == null || clip.Frames.Length == 0)
-                return;
-
-            float duration = Mathf.Max(0.001f, clip.Duration);
-            float wrapped = time % duration;
-            float frameTime = wrapped / duration * (clip.Frames.Length - 1);
-            int a = Mathf.Clamp(Mathf.FloorToInt(frameTime), 0, clip.Frames.Length - 1);
-            int b = Mathf.Min(a + 1, clip.Frames.Length - 1);
+            int count = clip.Frames.Length;
+            float frameTime = Mathf.Repeat(phase, 1f) * count;
+            int a = Mathf.Clamp(Mathf.FloorToInt(frameTime), 0, count - 1);
+            int b = (a + 1) % count;
             float u = frameTime - a;
             var fa = clip.Frames[a];
             var fb = clip.Frames[b];
-            int n = Mathf.Min(boneCount, Mathf.Min(fa.Length, fb.Length));
+            int n = Mathf.Min(t.Length, Mathf.Min(fa.Length, fb.Length));
             for (int i = 0; i < n; i++)
             {
                 t[i] = Vector3.Lerp(fa[i].T, fb[i].T, u);
