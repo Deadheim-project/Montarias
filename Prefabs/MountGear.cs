@@ -4,13 +4,15 @@ using System.Collections.Generic;
 
 namespace ValheimMontarias.Prefabs
 {
+    // After MountClipPlayer poses the skin bones, before RiderVisualFix (10000) reads the seat.
+    [DefaultExecutionOrder(1000)]
     public sealed class MountSaddleAnchor : MonoBehaviour
     {
         public float SitHeight = 0.12f;
 
-        /// <summary>Set when the saddle rides a bone of the vanilla body (the Neck sways its
-        /// whole body while walking/idling): the seat is refitted after each animated frame so
-        /// the rider goes along with the saddle.</summary>
+        /// <summary>Set when the saddle rides a bone of the body (every mount sways its body
+        /// while walking/idling): the seat is refitted after each animated frame so the rider
+        /// goes along with the saddle.</summary>
         public GameObject FollowMount;
 
         private void LateUpdate()
@@ -241,25 +243,21 @@ namespace ValheimMontarias.Prefabs
 
             var anchor = saddle.AddComponent<MountSaddleAnchor>();
             anchor.SitHeight = sitHeight;
-            if (FollowsBody(profile) && FollowBone(mount, saddle.transform))
+            if (FollowBone(mount, saddle.transform))
                 anchor.FollowMount = mount;
             Fit(mount);
         }
 
-        /// <summary>Mounts whose vanilla animation moves the whole body under a saddle that
-        /// would otherwise stay still.</summary>
-        private static bool FollowsBody(MountProfile profile)
-        {
-            return profile != null && profile.Id == "neck";
-        }
-
         /// <summary>Moves the saddle under the body bone nearest to it, keeping where it is, so
-        /// it sways with the body. The animated bones are the vanilla SkinnedMeshRenderer's.</summary>
+        /// it sways with the body. With a custom skin (capivara) the bones are the overlay's,
+        /// since the vanilla body under it is hidden; otherwise the vanilla SkinnedMeshRenderer's.</summary>
         private static bool FollowBone(GameObject mount, Transform saddle)
         {
             Transform best = null;
             float bestDist = float.PositiveInfinity;
-            foreach (var skin in mount.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            var overlay = MountVisuals.Overlay(mount);
+            var root = overlay != null ? overlay : mount.transform;
+            foreach (var skin in root.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
                 if (skin == null || skin.bones == null || IsSaddle(skin.transform)) continue;
                 if (skin.GetComponentInParent<Player>() != null) continue;
