@@ -13,6 +13,12 @@ namespace ValheimMontarias.Prefabs
         public const string DisplayName = "Capivara";
         private const float InfiniteStamina = 1000000f;
 
+        /// <summary>Aesir 28/30: the rider's own name/skin for the mount instance, stored in
+        /// its ZDO at summon time (MountControl.FinishSummon) so every nearby client -- which
+        /// each builds its own local GameObject for the same ZDO -- reads the same value.</summary>
+        internal static readonly int RiderNameHash = "ValheimMontarias_RiderName".GetStableHashCode();
+        internal static readonly int RiderSkinHash = "ValheimMontarias_RiderSkin".GetStableHashCode();
+
         internal static GameObject Prefab { get; private set; }
 
         private static Transform _hidden;
@@ -80,9 +86,82 @@ namespace ValheimMontarias.Prefabs
         public static void ApplyName(Character character, MountProfile profile)
         {
             if (character == null) return;
-            string name = profile != null ? profile.Name : (MountSettings.Default != null ? MountSettings.Default.Name : DisplayName);
+            string custom = ReadZdoString(character.gameObject, RiderNameHash);
+            string name = !string.IsNullOrEmpty(custom)
+                ? custom
+                : profile != null ? profile.Name : (MountSettings.Default != null ? MountSettings.Default.Name : DisplayName);
             Access.Set(character, "m_name", name);
         }
+
+        internal static string ReadZdoString(GameObject go, int hash)
+        {
+            var nview = go != null ? go.GetComponent<ZNetView>() : null;
+            if (nview == null || !nview.IsValid()) return null;
+            return nview.GetZDO()?.GetString(hash, "");
+        }
+
+        internal static void SetZdoString(GameObject go, int hash, string value)
+        {
+            var nview = go != null ? go.GetComponent<ZNetView>() : null;
+            if (nview == null || !nview.IsValid()) return;
+            nview.GetZDO()?.Set(hash, value ?? "");
+        }
+
+        /// <summary>Called once at summon (MountControl.FinishSummon), before the first
+        /// ApplyAll: writes the summoner's own name/skin choice (RiderClient, already
+        /// server-approved) into the new mount's ZDO, where ApplyName and
+        /// MountVisuals' tint read it back for every client watching this instance.</summary>
+        public static void ApplyRiderCosmetics(GameObject go, MountProfile profile)
+        {
+            if (go == null || profile == null) return;
+            string name = MountSettings.MountNameActive != null && MountSettings.MountNameActive.Value
+                ? RiderClient.NameOf(profile.Id) : "";
+            string skin = MountSettings.MountSkinActive != null && MountSettings.MountSkinActive.Value
+                ? RiderClient.SkinOf(profile.Id) : "";
+            SetZdoString(go, RiderNameHash, name);
+            SetZdoString(go, RiderSkinHash, skin);
+        }
+
+        /// <summary>Aesir 28/30: re-aplica o nome e a tinta cosmética do jogador local em
+        /// todas as montarias que já estão invocadas no mundo. Chamado pelo RiderClient.Apply
+        /// (sempre que o servidor confirma novo estado) para que uma troca de nome/skin feita
+        /// pelo menu apareça imediatamente, sem precisar desvocar e revocar a montaria.</summary>
+        public static void RefreshCosmetics()
+        {
+            bool nameActive = MountSettings.MountNameActive?.Value ?? false;
+            bool skinActive = MountSettings.MountSkinActive?.Value ?? false;
+            if (!nameActive && !skinActive) return;
+
+            var player = Player.m_localPlayer;
+            if (player == null) return;
+            long playerId = player.GetPlayerID();
+
+            foreach (var character in Character.GetAllCharacters())
+            {
+                if (character == null || character.gameObject == null) continue;
+                if (!IsOurs(character.gameObject)) continue;
+
+                // Só re-aplica nas montarias que pertencem ao jogador local.
+                long owner = MountControl.OwnerId(character.gameObject);
+                if (owner != playerId) continue;
+
+                var profile = MountSettings.Find(character.gameObject) ?? MountSettings.Default;
+                if (profile == null) continue;
+
+                // Atualiza o ZDO com os valores mais recentes (que o servidor acabou de confirmar).
+                ApplyRiderCosmetics(character.gameObject, profile);
+
+                // Aplica o nome ao Character (EnemyHud usa m_name diretamente).
+                ApplyName(character, profile);
+
+                // Re-aplica a tinta.
+                MountVisuals.ApplySkinTint(character.gameObject, profile);
+            }
+        }
+
+        /// <summary>True if the GameObject is one of the mount prefab instances managed by
+        /// this mod (used by patches in other files).</summary>
+        public static bool IsMountPrefab(GameObject go) => IsOurs(go);
 
         public static void ApplyScale(GameObject go)
         {

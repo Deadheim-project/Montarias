@@ -374,6 +374,10 @@ namespace ValheimMontarias.Prefabs
             Access.Call(tame, "Tame");
             Access.SetSaddle(tame, true);
             MountHub.ApplyAll(go);
+            // Aesir 28/30: write the rider's chosen name and skin into the ZDO so every
+            // nearby client shows the same customized mount.
+            var profile = MountSettings.Find(go) ?? MountSettings.Default;
+            MountPrefab.ApplyRiderCosmetics(go, profile);
             IgnoreRider(go, player);
             Hide(go);
 

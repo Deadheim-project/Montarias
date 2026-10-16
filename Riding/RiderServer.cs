@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using BepInEx;
 
 namespace ValheimMontarias
@@ -30,6 +31,12 @@ namespace ValheimMontarias
             public int Rank;
             public readonly HashSet<string> Mounts = new HashSet<string>(StringComparer.Ordinal);
 
+            /// <summary>Aesir 28: nome escolhido pelo jogador, por montaria (mountId -> nome).</summary>
+            public readonly Dictionary<string, string> Names = new Dictionary<string, string>(StringComparer.Ordinal);
+
+            /// <summary>Aesir 30: skin escolhida pelo jogador, por montaria (mountId -> skinId).</summary>
+            public readonly Dictionary<string, string> Skins = new Dictionary<string, string>(StringComparer.Ordinal);
+
             public string MountList => string.Join(",", Mounts.OrderBy(m => m, StringComparer.Ordinal));
         }
 
@@ -51,22 +58,17 @@ namespace ValheimMontarias
             if (!IsServer) return false;
 
             string name = null;
-            string host = null;
             var peer = FindPeer(sender);
             if (peer != null)
-            {
                 name = Access.Get(peer, "m_playerName") as string;
-                host = HostName(peer);
-            }
             else if (IsLocalSender(sender))
             {
                 name = Player.m_localPlayer != null ? Player.m_localPlayer.GetPlayerName() : null;
                 if (string.IsNullOrWhiteSpace(name))
                     name = Game.instance != null ? Game.instance.GetPlayerProfile()?.GetName() : null;
-                host = LocalPlatformId();
             }
 
-            string account = CanonicalAccountId(host);
+            string account = AccountIdOf(sender);
             who = $"{name ?? "???"} ({(account.Length > 0 ? account : "sem conta")})";
             if (string.IsNullOrWhiteSpace(name) || account.Length == 0) return false;
 
@@ -75,6 +77,19 @@ namespace ValheimMontarias
                 file.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return false;
             key = file;
             return true;
+        }
+
+        /// <summary>The account id ("Steam_765...") behind a routed RPC sender, the same way
+        /// <see cref="TryResolve"/> derives it -- used by <see cref="Integration.VipProvider"/>
+        /// to look the sender up on the VIP list without needing their character name.</summary>
+        internal static string AccountIdOf(long sender)
+        {
+            if (!IsServer) return "";
+            string host = null;
+            var peer = FindPeer(sender);
+            if (peer != null) host = HostName(peer);
+            else if (IsLocalSender(sender)) host = LocalPlatformId();
+            return CanonicalAccountId(host);
         }
 
         /// <summary>A Steam socket reports the bare SteamID, a crossplay one "Platform_id";
@@ -182,6 +197,16 @@ namespace ValheimMontarias
                         foreach (var id in value.Split(','))
                             if (id.Trim().Length > 0) record.Mounts.Add(id.Trim());
                     }
+                    else if (name.StartsWith("name_", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var id = name.Substring(5).Trim();
+                        if (id.Length > 0 && value.Length > 0) record.Names[id] = value;
+                    }
+                    else if (name.StartsWith("skin_", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var id = name.Substring(5).Trim();
+                        if (id.Length > 0 && value.Length > 0) record.Skins[id] = value;
+                    }
                 }
                 record.Rank = Math.Max(0, record.Rank);
                 return true;
@@ -196,9 +221,32 @@ namespace ValheimMontarias
         internal static void Save(string key, Record record)
         {
             Directory.CreateDirectory(Folder);
-            File.WriteAllText(PathOf(key),
-                "rank=" + record.Rank.ToString(CultureInfo.InvariantCulture) + Environment.NewLine +
-                "mounts=" + record.MountList + Environment.NewLine);
+            var text = new StringBuilder();
+            text.Append("rank=").Append(record.Rank.ToString(CultureInfo.InvariantCulture)).AppendLine();
+            text.Append("mounts=").Append(record.MountList).AppendLine();
+            foreach (var pair in record.Names.OrderBy(p => p.Key, StringComparer.Ordinal))
+                text.Append("name_").Append(pair.Key).Append('=').Append(pair.Value).AppendLine();
+            foreach (var pair in record.Skins.OrderBy(p => p.Key, StringComparer.Ordinal))
+                text.Append("skin_").Append(pair.Key).Append('=').Append(pair.Value).AppendLine();
+            File.WriteAllText(PathOf(key), text.ToString());
+        }
+
+        /// <summary>Strips newlines, the net-protocol separators (":" ";") and control
+        /// characters from a player-chosen display string (a mount's name), then clamps it.
+        /// Empty input stays empty (clears the custom name).</summary>
+        internal static string SanitizeDisplayName(string raw, int maxLength)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return "";
+            var text = new StringBuilder(raw.Length);
+            foreach (var ch in raw.Trim())
+            {
+                if (ch == ':' || ch == ';' || char.IsControl(ch)) continue;
+                text.Append(ch);
+            }
+            var result = text.ToString().Trim();
+            maxLength = Math.Max(1, maxLength);
+            if (result.Length > maxLength) result = result.Substring(0, maxLength).Trim();
+            return result;
         }
 
         internal static void AppendLog(string line)
@@ -255,12 +303,56 @@ namespace ValheimMontarias
             }, $"ganhou a montaria {profile.Id}");
         }
 
+        /// <summary>Aesir 28: nomeia (ou, com nome vazio, limpa o nome de) uma montaria que o
+        /// jogador possui. A posse e o VIP (quando exigido pela config) já foram conferidos
+        /// pelo chamador; aqui a posse é conferida de novo, pois é o servidor quem decide.</summary>
+        internal static string SetName(long sender, string mountId, string name, string why)
+        {
+            var profile = MountSettings.ById(mountId);
+            if (profile == null) return "Esta montaria não existe.";
+            string what = string.IsNullOrEmpty(name)
+                ? $"removeu o nome de {profile.Id}"
+                : $"nomeou {profile.Id} como \"{name}\"";
+            return Change(sender, why, record =>
+            {
+                if (!record.Mounts.Contains(profile.Id)) return $"Você não possui {profile.Name}.";
+                if (string.IsNullOrEmpty(name)) record.Names.Remove(profile.Id);
+                else record.Names[profile.Id] = name;
+                return null;
+            }, what);
+        }
+
+        /// <summary>Aesir 30: escolhe (ou, com skinId vazio/"Padrao", limpa) a skin de uma
+        /// montaria que o jogador possui.</summary>
+        internal static string SetSkin(long sender, string mountId, string skinId, string why)
+        {
+            var profile = MountSettings.ById(mountId);
+            if (profile == null) return "Esta montaria não existe.";
+            bool clear = string.IsNullOrEmpty(skinId) ||
+                         skinId.Equals(MountProfile.DefaultSkinId, StringComparison.OrdinalIgnoreCase);
+            string what = clear ? $"removeu a skin de {profile.Id}" : $"escolheu a skin \"{skinId}\" de {profile.Id}";
+            return Change(sender, why, record =>
+            {
+                if (!record.Mounts.Contains(profile.Id)) return $"Você não possui {profile.Name}.";
+                if (clear)
+                {
+                    record.Skins.Remove(profile.Id);
+                    return null;
+                }
+                if (!profile.TryGetSkinColor(skinId, out _)) return "Esta skin não existe.";
+                record.Skins[profile.Id] = skinId;
+                return null;
+            }, what);
+        }
+
         internal static string Reset(long sender, string why)
         {
             return Change(sender, why, record =>
             {
                 record.Rank = 0;
                 record.Mounts.Clear();
+                record.Names.Clear();
+                record.Skins.Clear();
                 return null;
             }, "zerou habilidade e montarias");
         }

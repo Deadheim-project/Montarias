@@ -22,6 +22,14 @@ namespace ValheimMontarias.Prefabs
         private const float StrideSpeed = 0.4f;
         private const float WeightRate = 4f;
 
+        // The clip barely moves the hips (a 4 cm bob, no side sway), so the rump looked glued
+        // in place. On top of it the rear rolls and swings in one smooth wave per stride, timed
+        // to the hind feet, pivoting at Spine.1 so the front and the seat stay steady.
+        private const float WalkRoll = 6f, WalkYaw = 5f;
+        private const float RunRoll = 4f, RunYaw = 3f;
+        private const float BobGain = 1.4f;
+        private const float BodyFollow = 0.2f;  // share of the sway the front of the body keeps
+
         private Transform[] _bones;
         private MountSkin.Clip _idle, _walk, _run, _swim;
         private float _wIdle = 1f, _wWalk, _wRun, _wSwim;
@@ -34,6 +42,9 @@ namespace ValheimMontarias.Prefabs
         private Vector3[] _accT, _t;
         private Quaternion[] _accQ, _q;
         private Vector3[] _accS, _s;
+        private Transform _pelvis, _spine;
+        private Vector3 _pelvisRest;
+        private float _walkSwayAt, _runSwayAt;  // clip phase where the left hind foot is highest
 
         public void Setup(Transform[] bones, MountSkin.Clip[] clips)
         {
@@ -47,6 +58,11 @@ namespace ValheimMontarias.Prefabs
             _accT = new Vector3[n]; _t = new Vector3[n];
             _accQ = new Quaternion[n]; _q = new Quaternion[n];
             _accS = new Vector3[n]; _s = new Vector3[n];
+            _pelvis = FindBone("Pelvis");
+            _spine = FindBone("Spine.1");
+            if (_pelvis != null) _pelvisRest = _pelvis.localPosition;
+            _walkSwayAt = SwayPeak(_walk);
+            _runSwayAt = SwayPeak(_run);
         }
 
         private void LateUpdate()
@@ -88,6 +104,82 @@ namespace ValheimMontarias.Prefabs
             }
 
             Pose();
+            SwayHips();
+        }
+
+        /// <summary>Rolls and swings the rump toward the hind leg on the ground, as a sine over
+        /// the gait phase, so it is smooth whatever the feet do frame to frame.</summary>
+        private void SwayHips()
+        {
+            if (_pelvis == null || _spine == null) return;
+            float moving = _wWalk + _wRun;
+            float move = Mathf.Clamp01(moving) * (1f - Mathf.Clamp01(_wSwim));
+            if (move <= 0.001f) return;
+            float runMix = _wRun / moving;
+
+            _pelvis.localPosition = _pelvisRest + (_pelvis.localPosition - _pelvisRest) * Mathf.Lerp(1f, BobGain, move);
+
+            // +1 while the left hind foot is up (standing on the right one), -1 the other way.
+            float side = Mathf.Lerp(SwayWave(_walk, _walkSwayAt), SwayWave(_run, _runSwayAt), runMix) * move;
+            // The hip of the lifted leg drops and the rump moves over the planted one.
+            float roll = -side * Mathf.Lerp(WalkRoll, RunRoll, runMix);
+            float yaw = side * Mathf.Lerp(WalkYaw, RunYaw, runMix);
+            Quaternion q = Quaternion.AngleAxis(roll, transform.forward) * Quaternion.AngleAxis(yaw, transform.up);
+
+            Vector3 pivot = _spine.position;
+            Quaternion spine = _spine.rotation;
+            _pelvis.SetPositionAndRotation(pivot + q * (_pelvis.position - pivot), q * _pelvis.rotation);
+            _spine.rotation = Quaternion.Slerp(Quaternion.identity, q, BodyFollow) * spine;
+        }
+
+        private float SwayWave(MountSkin.Clip clip, float peak)
+        {
+            if (clip == null) return 0f;
+            return Mathf.Cos(2f * Mathf.PI * (ClipPhase(clip, _gaitPhase) - peak));
+        }
+
+        /// <summary>The phase <see cref="Sample"/> actually reads for this clip.</summary>
+        private static float ClipPhase(MountSkin.Clip clip, float phase)
+        {
+            phase = Mathf.Repeat(phase, 1f);
+            return System.Array.IndexOf(ReversedClips, clip.Name) >= 0 ? 1f - phase : phase;
+        }
+
+        /// <summary>Poses every frame of the clip once and finds, from the first harmonic of
+        /// (left - right) hind-foot height, the phase where the left foot is up.</summary>
+        private float SwayPeak(MountSkin.Clip clip)
+        {
+            var footL = FindBone("Foot_L");
+            var footR = FindBone("Foot_R");
+            if (clip == null || clip.Frames == null || footL == null || footR == null) return 0f;
+            int count = clip.Frames.Length;
+            float c = 0f, s = 0f;
+            for (int f = 0; f < count; f++)
+            {
+                var frame = clip.Frames[f];
+                int n = Mathf.Min(_bones.Length, frame.Length);
+                for (int i = 0; i < n; i++)
+                {
+                    if (_bones[i] == null) continue;
+                    _bones[i].localPosition = frame[i].T;
+                    _bones[i].localRotation = frame[i].Q;
+                }
+                float lift = transform.InverseTransformPoint(footL.position).y
+                    - transform.InverseTransformPoint(footR.position).y;
+                float a = 2f * Mathf.PI * f / count;
+                c += lift * Mathf.Cos(a);
+                s += lift * Mathf.Sin(a);
+            }
+            return Mathf.Repeat(Mathf.Atan2(s, c) / (2f * Mathf.PI), 1f);
+        }
+
+        private Transform FindBone(string name)
+        {
+            if (_bones == null) return null;
+            for (int i = 0; i < _bones.Length; i++)
+                if (_bones[i] != null && _bones[i].name == name)
+                    return _bones[i];
+            return null;
         }
 
         /// <summary>Real cadence at a crawl (feet stick), the natural curve above it.</summary>

@@ -443,6 +443,127 @@ namespace ValheimMontarias
                 Select(profile);
                 Say($"{profile.Name} selecionada.");
             });
+
+            // Aesir 28/30: cosmetic controls (name and skin) -- shown only when the feature
+            // is active and the player owns the mount. VIP check is done server-side; we show
+            // the controls to everyone so non-VIP gets a clear server message explaining why.
+            if (MountRoster.Owns(profile) &&
+                ((MountSettings.MountNameActive?.Value ?? false) || (MountSettings.MountSkinActive?.Value ?? false)))
+            {
+                AddCosmeticSection(_journalDetail, profile);
+            }
+        }
+
+        private void AddCosmeticSection(RectTransform parent, MountProfile profile)
+        {
+            // Separator label
+            var sep = ValheimUi.CreateLabel(parent, "— Cosméticos (Aesir) —", 14,
+                ValheimUi.Orange, TextAlignmentOptions.Center, display: true);
+            ValheimUi.Anchor((RectTransform)sep.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(16f, -230f), new Vector2(-16f, -210f));
+
+            // --- Nome (Aesir 28) ---
+            if (MountSettings.MountNameActive?.Value ?? false)
+            {
+                var nameLabel = ValheimUi.CreateLabel(parent,
+                    $"Nome: {(string.IsNullOrEmpty(RiderClient.NameOf(profile.Id)) ? "<cor padrão>" : RiderClient.NameOf(profile.Id))}",
+                    13, ValheimUi.Beige, TextAlignmentOptions.Left);
+                ValheimUi.Anchor((RectTransform)nameLabel.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                    new Vector2(16f, -258f), new Vector2(-16f, -234f));
+
+                var nameRow = ValheimUi.CreateRect("NomeRow", parent);
+                ValheimUi.Anchor(nameRow, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                    new Vector2(16f, -298f), new Vector2(-16f, -262f));
+                var nameLayout = nameRow.gameObject.AddComponent<UnityEngine.UI.HorizontalLayoutGroup>();
+                nameLayout.spacing = 6f;
+                nameLayout.childControlWidth = true;
+                nameLayout.childControlHeight = true;
+                nameLayout.childForceExpandWidth = false;
+                nameLayout.childForceExpandHeight = true;
+                nameLayout.childAlignment = TextAnchor.MiddleLeft;
+
+                int maxLen = MountSettings.MountNameMaxLength?.Value ?? 20;
+                var nameField = ValheimUi.CreateInputField(nameRow, RiderClient.NameOf(profile.Id), 200f, 34f);
+                nameField.characterLimit = maxLen;
+                var nameFlexEl = nameField.gameObject.GetComponent<UnityEngine.UI.LayoutElement>()
+                    ?? nameField.gameObject.AddComponent<UnityEngine.UI.LayoutElement>();
+                nameFlexEl.flexibleWidth = 1f;
+
+                var nameOk = ValheimUi.CreateButton(nameRow, "OK", 60f, 34f, 13);
+                nameOk.onClick.AddListener(() =>
+                {
+                    string argument = profile.Id + "\n" + nameField.text;
+                    if (RiderNet.Send(RiderNet.ActionSetName, argument))
+                        Say("Pedido enviado ao servidor...");
+                    else
+                        Say("O pedido não chegou ao servidor.");
+                });
+
+                var nameClear = ValheimUi.CreateButton(nameRow, "Limpar", 70f, 34f, 13);
+                nameClear.onClick.AddListener(() =>
+                {
+                    if (RiderNet.Send(RiderNet.ActionSetName, profile.Id + "\n"))
+                        Say("Nome removido (pedido enviado).");
+                    else
+                        Say("O pedido não chegou ao servidor.");
+                });
+            }
+
+            // --- Skin (Aesir 30) ---
+            if (MountSettings.MountSkinActive?.Value ?? false)
+            {
+                var skinOptions = profile.SkinOptions();
+                if (skinOptions.Count > 1) // there is at least one non-Padrao skin
+                {
+                    var skinLabel = ValheimUi.CreateLabel(parent,
+                        $"Skin: {(string.IsNullOrEmpty(RiderClient.SkinOf(profile.Id)) ? "Padrão" : RiderClient.SkinOf(profile.Id))}",
+                        13, ValheimUi.Beige, TextAlignmentOptions.Left);
+                    ValheimUi.Anchor((RectTransform)skinLabel.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                        new Vector2(16f, -316f), new Vector2(-16f, -302f));
+
+                    // One button per skin option, in a horizontal strip below the label.
+                    float skinRowTop = -320f;
+                    float skinRowBottom = -356f;
+                    var skinRow = ValheimUi.CreateRect("SkinRow", parent);
+                    ValheimUi.Anchor(skinRow, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                        new Vector2(16f, skinRowBottom), new Vector2(-16f, skinRowTop));
+                    var skinLayout = skinRow.gameObject.AddComponent<UnityEngine.UI.HorizontalLayoutGroup>();
+                    skinLayout.spacing = 6f;
+                    skinLayout.childControlWidth = true;
+                    skinLayout.childControlHeight = true;
+                    skinLayout.childForceExpandWidth = false;
+                    skinLayout.childForceExpandHeight = true;
+                    skinLayout.childAlignment = TextAnchor.MiddleLeft;
+
+                    string currentSkin = RiderClient.SkinOf(profile.Id);
+                    foreach (var (skinId, skinColor) in skinOptions)
+                    {
+                        string id = skinId; // capture for lambda
+                        bool isActive = string.IsNullOrEmpty(currentSkin)
+                            ? id == MountProfile.DefaultSkinId
+                            : string.Equals(id, currentSkin, StringComparison.OrdinalIgnoreCase);
+
+                        var skinBtn = ValheimUi.CreateButton(skinRow, id, 0f, 34f, 12);
+                        if (skinBtn.image != null)
+                        {
+                            // Use the skin color as a hint on the button background.
+                            skinBtn.image.color = isActive ? Color.white : new Color(skinColor.r, skinColor.g, skinColor.b, 0.85f);
+                        }
+                        var btnEl = skinBtn.gameObject.AddComponent<UnityEngine.UI.LayoutElement>();
+                        btnEl.preferredWidth = 80f;
+                        btnEl.flexibleWidth = 1f;
+                        skinBtn.interactable = !isActive;
+                        skinBtn.onClick.AddListener(() =>
+                        {
+                            string value = id == MountProfile.DefaultSkinId ? "" : id;
+                            if (RiderNet.Send(RiderNet.ActionSetSkin, profile.Id + "\n" + value))
+                                Say("Skin enviada ao servidor...");
+                            else
+                                Say("O pedido não chegou ao servidor.");
+                        });
+                    }
+                }
+            }
         }
 
         private static string StateOf(MountProfile profile, MountProfile selected)

@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using HarmonyLib;
 using UnityEngine;
+using ValheimMontarias.Integration;
 
 namespace ValheimMontarias
 {
@@ -27,6 +29,12 @@ namespace ValheimMontarias
         internal const string ActionGrantMount = "admin-grant-mount";
         internal const string ActionNextRank = "admin-next-rank";
         internal const string ActionReset = "admin-reset";
+
+        /// <summary>Aesir 28/30: not an admin action -- any player may ask, for a mount they
+        /// own, subject to the VIP gate in MountSettings.MountNameVipOnly/MountSkinVipOnly.
+        /// Argument: "mountId\n&lt;new value&gt;" (empty value clears it).</summary>
+        internal const string ActionSetName = "set-name";
+        internal const string ActionSetSkin = "set-skin";
 
         private static ZRoutedRpc _registered;
         private static readonly Dictionary<long, (float start, int count)> Rate =
@@ -93,6 +101,18 @@ namespace ValheimMontarias
                 return;
             }
 
+            if (action == ActionSetName)
+            {
+                HandleSetCosmetic(sender, argument, isSkin: false);
+                return;
+            }
+
+            if (action == ActionSetSkin)
+            {
+                HandleSetCosmetic(sender, argument, isSkin: true);
+                return;
+            }
+
             if (!RiderServer.IsAdmin(sender))
             {
                 Plugin.Log.LogWarning($"ValheimMontarias: refused admin action '{action}' from {who}");
@@ -127,6 +147,54 @@ namespace ValheimMontarias
             SendMessage(sender, refusal ?? done);
         }
 
+        /// <summary>Aesir 28/30: the player names or picks a skin for a mount they own
+        /// (argument "mountId\nvalue", empty value clears it). Cosmetic, but still VIP-gated
+        /// server-side (MountSettings.MountNameVipOnly/MountSkinVipOnly) so a modified client
+        /// cannot grant itself the Aesir perk -- only showing a different name/tint to
+        /// everyone watching, which is what makes the gate worth having here.</summary>
+        private static void HandleSetCosmetic(long sender, string argument, bool isSkin)
+        {
+            var parts = (argument ?? "").Split(new[] { '\n' }, 2);
+            string mountId = parts.Length > 0 ? parts[0].Trim() : "";
+            string rawValue = parts.Length > 1 ? parts[1] : "";
+
+            bool active = isSkin ? MountSettings.MountSkinActive?.Value ?? true : MountSettings.MountNameActive?.Value ?? true;
+            if (!active)
+            {
+                SendMessage(sender, isSkin ? "Skin de montaria desativada neste servidor." : "Nome de montaria desativado neste servidor.");
+                return;
+            }
+
+            bool vipOnly = isSkin ? MountSettings.MountSkinVipOnly?.Value ?? true : MountSettings.MountNameVipOnly?.Value ?? true;
+            if (vipOnly && !VipProvider.IsVip(sender))
+            {
+                SendMessage(sender, "Este recurso é exclusivo para VIP (Aesir).");
+                return;
+            }
+
+            string refusal;
+            string done;
+            if (isSkin)
+            {
+                string skinId = rawValue.Trim();
+                refusal = RiderServer.SetSkin(sender, mountId, skinId, "jogador");
+                var profile = MountSettings.ById(mountId);
+                done = string.IsNullOrEmpty(skinId) || skinId.Equals(MountProfile.DefaultSkinId, StringComparison.OrdinalIgnoreCase)
+                    ? $"Skin de {profile?.Name ?? mountId} removida."
+                    : $"Skin de {profile?.Name ?? mountId} definida: {skinId}.";
+            }
+            else
+            {
+                string name = RiderServer.SanitizeDisplayName(rawValue, MountSettings.MountNameMaxLength?.Value ?? 20);
+                refusal = RiderServer.SetName(sender, mountId, name, "jogador");
+                var profile = MountSettings.ById(mountId);
+                done = string.IsNullOrEmpty(name)
+                    ? $"Nome de {profile?.Name ?? mountId} removido."
+                    : $"Nome de {profile?.Name ?? mountId} definido: {name}.";
+            }
+            SendMessage(sender, refusal ?? done);
+        }
+
         /// <summary>Eight requests per two seconds per peer: the menu asks once when it opens,
         /// so anything above that is a client asking on purpose.</summary>
         private static bool AllowRate(long sender)
@@ -142,8 +210,13 @@ namespace ValheimMontarias
         internal static void SendState(long peer, RiderServer.Record record, string message)
         {
             if (record == null) return;
-            Push(peer, record.Rank.ToString(CultureInfo.InvariantCulture) + "\n" + record.MountList, message);
+            string state = record.Rank.ToString(CultureInfo.InvariantCulture) + "\n" + record.MountList + "\n" +
+                SerializeMap(record.Names) + "\n" + SerializeMap(record.Skins);
+            Push(peer, state, message);
         }
+
+        private static string SerializeMap(Dictionary<string, string> map) =>
+            string.Join(";", map.Select(pair => pair.Key + ":" + pair.Value));
 
         private static void SendMessage(long peer, string message) => Push(peer, "", message);
 
@@ -159,9 +232,9 @@ namespace ValheimMontarias
             if (!string.IsNullOrEmpty(state))
             {
                 var parts = state.Split('\n');
-                if (parts.Length == 2 && int.TryParse(parts[0], NumberStyles.Integer,
+                if (parts.Length >= 2 && int.TryParse(parts[0], NumberStyles.Integer,
                         CultureInfo.InvariantCulture, out int rank))
-                    RiderClient.Apply(rank, parts[1]);
+                    RiderClient.Apply(rank, parts[1], parts.Length > 2 ? parts[2] : "", parts.Length > 3 ? parts[3] : "");
                 else
                     Plugin.Log.LogWarning($"ValheimMontarias: malformed rider state \"{state}\"");
             }
@@ -179,6 +252,8 @@ namespace ValheimMontarias
     internal static class RiderClient
     {
         private static readonly HashSet<string> OwnedMounts = new HashSet<string>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, string> Names = new Dictionary<string, string>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, string> Skins = new Dictionary<string, string>(StringComparer.Ordinal);
         private static float _lastRequest = -10f;
 
         public static bool Known { get; private set; }
@@ -192,11 +267,19 @@ namespace ValheimMontarias
 
         public static bool Owns(string mountId) => OwnedMounts.Contains(mountId ?? "");
 
+        /// <summary>The local player's own custom name for a mount they own (Aesir 28), or "".</summary>
+        public static string NameOf(string mountId) => Names.TryGetValue(mountId ?? "", out var value) ? value : "";
+
+        /// <summary>The local player's own chosen skin id for a mount they own (Aesir 30), or "".</summary>
+        public static string SkinOf(string mountId) => Skins.TryGetValue(mountId ?? "", out var value) ? value : "";
+
         public static void Reset()
         {
             Known = false;
             Rank = 0;
             OwnedMounts.Clear();
+            Names.Clear();
+            Skins.Clear();
             LastMessage = null;
             _lastRequest = -10f;
             Revision++;
@@ -211,7 +294,7 @@ namespace ValheimMontarias
             RiderNet.Send(RiderNet.ActionState, "");
         }
 
-        internal static void Apply(int rank, string mounts)
+        internal static void Apply(int rank, string mounts, string names, string skins)
         {
             // The first answer after logging in is the baseline. After that, a mount that
             // appears in the list was just bought or granted, and its item goes in the bag.
@@ -223,8 +306,16 @@ namespace ValheimMontarias
             OwnedMounts.Clear();
             foreach (var id in (mounts ?? "").Split(','))
                 if (id.Trim().Length > 0) OwnedMounts.Add(id.Trim());
+            Names.Clear();
+            ParseMap(Names, names);
+            Skins.Clear();
+            ParseMap(Skins, skins);
             Revision++;
             Prefabs.MountHub.ApplySpeedAll();
+
+            // Aesir 28/30: re-aplica nome e tinta nas montarias já invocadas no mundo,
+            // para que a mudança apareça imediatamente sem precisar re-invocar.
+            Prefabs.MountPrefab.RefreshCosmetics();
 
             if (baseline) return;
             var player = Player.m_localPlayer;
@@ -242,6 +333,19 @@ namespace ValheimMontarias
             LastMessage = message;
             MessageRevision++;
             Player.m_localPlayer?.Message(MessageHud.MessageType.Center, message);
+        }
+
+        private static void ParseMap(Dictionary<string, string> map, string raw)
+        {
+            if (string.IsNullOrEmpty(raw)) return;
+            foreach (var pair in raw.Split(';'))
+            {
+                int sep = pair.IndexOf(':');
+                if (sep <= 0) continue;
+                var id = pair.Substring(0, sep);
+                var value = pair.Substring(sep + 1);
+                if (id.Length > 0 && value.Length > 0) map[id] = value;
+            }
         }
     }
 

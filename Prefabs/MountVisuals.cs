@@ -38,6 +38,7 @@ namespace ValheimMontarias.Prefabs
                 float mountScale = profile?.Scale != null ? Mathf.Clamp(profile.Scale.Value, 0.5f, 3f) : 1f;
                 MountGear.Attach(go, parent, 0.52f * mountScale, -0.38f,
                     MountGear.SaddleBackPoint(parent) + MountSettings.SaddlePositionOffsetFor(profile), false);
+                ApplySkinTint(go, profile);
                 return;
             }
 
@@ -68,6 +69,7 @@ namespace ValheimMontarias.Prefabs
             float scale = profile?.Scale != null ? Mathf.Clamp(profile.Scale.Value, 0.5f, 3f) : 1f;
             MountGear.Attach(go, overlay.transform, 0.52f * scale, -0.38f,
                 skin.SeatLocal + MountSettings.SaddlePositionOffsetFor(profile), false);
+            ApplySkinTint(go, profile);
         }
 
         public static Transform Overlay(GameObject go)
@@ -248,6 +250,53 @@ namespace ValheimMontarias.Prefabs
         private static string AssetPath(string fileName)
         {
             return Path.Combine(Paths.PluginPath, "ValheimMontarias", "Assets", fileName);
+        }
+
+        /// <summary>Aesir 30: tints the mount's renderers with the skin color stored in its ZDO
+        /// (written by MountPrefab.ApplyRiderCosmetics at summon time). Color white = no tint
+        /// (Padrao). Applied both to the custom overlay renderer and to the vanilla fallback
+        /// renderers when the .skin asset is absent. Alpha is always forced to 1 (no invisibility).
+        /// </summary>
+        public static void ApplySkinTint(GameObject go, MountProfile profile)
+        {
+            if (go == null) return;
+
+            // Read skin id from ZDO (written at summon time by ApplyRiderCosmetics).
+            string skinId = MountPrefab.ReadZdoString(go, MountPrefab.RiderSkinHash);
+            Color tint = Color.white;
+            if (!string.IsNullOrEmpty(skinId) &&
+                !skinId.Equals(MountProfile.DefaultSkinId, System.StringComparison.OrdinalIgnoreCase) &&
+                profile != null)
+            {
+                profile.TryGetSkinColor(skinId, out tint);
+            }
+            // Force alpha = 1: never allow invisibility.
+            tint.a = 1f;
+
+            // Apply to the custom overlay renderer (CapybaraVisual), if present.
+            var overlayTr = Overlay(go);
+            if (overlayTr != null)
+            {
+                var renderer = overlayTr.GetComponent<Renderer>();
+                if (renderer != null && renderer.material != null)
+                {
+                    if (renderer.material.HasProperty("_Color"))
+                        renderer.material.color = tint;
+                }
+                return;
+            }
+
+            // Fallback: vanilla renderers (no custom skin loaded).
+            var renderers = go.GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                var r = renderers[i];
+                if (r == null) continue;
+                if (r.GetComponentInParent<Player>() != null) continue;
+                if (MountGear.IsSaddle(r.transform)) continue;
+                if (r.material != null && r.material.HasProperty("_Color"))
+                    r.material.color = tint;
+            }
         }
     }
 }

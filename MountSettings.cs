@@ -48,6 +48,53 @@ namespace ValheimMontarias
         /// flying animations can do it.</summary>
         public bool Flies;
 
+        /// <summary>Aesir 30: cosmetic coat tints the owner may pick for this mount (same
+        /// stats). "Id:#RRGGBB" entries separated by "|"; "Padrao" (no tint) always exists
+        /// and does not need to be listed.</summary>
+        public ConfigEntry<string> SkinList;
+
+        /// <summary>Every skin option for this mount, "Padrao" (no tint, white) always first.</summary>
+        public List<(string Id, Color Color)> SkinOptions()
+        {
+            var list = new List<(string, Color)> { (DefaultSkinId, Color.white) };
+            if (SkinList == null || string.IsNullOrWhiteSpace(SkinList.Value))
+                return list;
+
+            foreach (var entry in SkinList.Value.Split('|'))
+            {
+                var trimmed = entry.Trim();
+                if (trimmed.Length == 0) continue;
+                int sep = trimmed.IndexOf(':');
+                if (sep <= 0) continue;
+                var id = trimmed.Substring(0, sep).Trim();
+                var colorText = trimmed.Substring(sep + 1).Trim();
+                if (id.Length == 0 || id.Equals(DefaultSkinId, StringComparison.OrdinalIgnoreCase)) continue;
+                if (ColorUtility.TryParseHtmlString(colorText, out var color))
+                    list.Add((id, color));
+            }
+            return list;
+        }
+
+        public const string DefaultSkinId = "Padrao";
+
+        /// <summary>The tint of a skin id, or white (no tint) when it does not exist.</summary>
+        public bool TryGetSkinColor(string id, out Color color)
+        {
+            if (!string.IsNullOrEmpty(id))
+            {
+                foreach (var option in SkinOptions())
+                {
+                    if (string.Equals(option.Id, id, StringComparison.OrdinalIgnoreCase))
+                    {
+                        color = option.Color;
+                        return true;
+                    }
+                }
+            }
+            color = Color.white;
+            return false;
+        }
+
         public MountProfile(string id, string defaultName, Func<GameObject, bool> isInstance, Action applyAll)
         {
             Id = id;
@@ -93,6 +140,17 @@ namespace ValheimMontarias
         public static ConfigEntry<bool> KnockOffOnHit;
         public static ConfigEntry<float> FlyMaxAltitude;
         public static ConfigEntry<float> FlyClimbSpeed;
+
+        /// <summary>Aesir 28: cada jogador escolhe um nome para a montaria que possui,
+        /// visível para todos acima dela.</summary>
+        public static ConfigEntry<bool> MountNameActive;
+        public static ConfigEntry<bool> MountNameVipOnly;
+        public static ConfigEntry<int> MountNameMaxLength;
+
+        /// <summary>Aesir 30: cada jogador escolhe uma skin (tingimento, mesmos stats) para a
+        /// montaria que possui.</summary>
+        public static ConfigEntry<bool> MountSkinActive;
+        public static ConfigEntry<bool> MountSkinVipOnly;
 
         public static float Run => Default != null ? Default.RunSpeed.Value : 12f;
         public static float Walk => Default != null ? Default.WalkSpeed.Value : 5.5f;
@@ -157,6 +215,18 @@ namespace ValheimMontarias
 
             UnlockAll = Bind(plugin, sync, "Geral", "LiberarTodasGratis", false,
                 "Se ligado, todo mundo tem a habilidade máxima e todas as montarias, sem comprar.");
+
+            MountNameActive = Bind(plugin, sync, "Cosmeticos", "NomeMontariaAtivo", true,
+                "Aesir 28: deixa o jogador dar um nome à montaria que possui (visível para todos acima dela).");
+            MountNameVipOnly = Bind(plugin, sync, "Cosmeticos", "NomeMontariaSoVip", true,
+                "Só VIP (Aesir) pode escolher o nome da montaria.");
+            MountNameMaxLength = Bind(plugin, sync, "Cosmeticos", "NomeMontariaTamanho", 20,
+                "Tamanho máximo do nome escolhido pelo jogador.");
+
+            MountSkinActive = Bind(plugin, sync, "Cosmeticos", "SkinMontariaAtivo", true,
+                "Aesir 30: deixa o jogador escolher uma skin (tingimento, mesmos stats) para a montaria que possui.");
+            MountSkinVipOnly = Bind(plugin, sync, "Cosmeticos", "SkinMontariaSoVip", true,
+                "Só VIP (Aesir) pode escolher a skin da montaria.");
 
             RidingRankList = Bind(plugin, sync, "Habilidade", "Niveis", RidingRanks.Default,
                 "Níveis da Habilidade de Montaria, em ordem: nome:velocidade:cast separados por |. " +
@@ -287,6 +357,10 @@ namespace ValheimMontarias
                 profile.AllowedSteamIds = Bind(plugin, sync, group, "SteamIdsLiberados", "",
                     "Lista de SteamIDs permitidos para esta montaria. Separe por vírgula. Vazio = qualquer um.");
             }
+
+            profile.SkinList = Bind(plugin, sync, group, "Skins", "Escura:#3A2C22|Clara:#E8DDCF|Dourada:#D4AF37",
+                "Skins cosméticas desta montaria (mesmos stats, Aesir 30): \"Nome:#RRGGBB\" separados por \"|\". " +
+                "\"Padrao\" (sem tingimento) sempre existe e não precisa estar na lista.");
 
             profile.CustomName.SettingChanged += (_, __) => profile.ApplyAll();
             profile.RunSpeed.SettingChanged += (_, __) => profile.ApplyAll();
