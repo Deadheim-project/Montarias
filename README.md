@@ -72,9 +72,49 @@ Cada mudança fica em `BepInEx/config/ValheimMontarias/cavaleiros.log`.
 
 ### API para outros mods
 
-`ValheimMontarias.MontariasApi` (estática, só tipos primitivos) é o que o NpcValheim chama
-por reflexão: catálogo (montarias, níveis), o estado do jogador local e, no servidor,
-`ServerRank` / `ServerOwns` / `ServerGrantRank` / `ServerGrantMount` pelo remetente do RPC.
+`ValheimMontarias.MontariasApi` (estática, só tipos primitivos, `Version = 2`) é o que o
+NpcValheim chama por reflexão: catálogo (montarias, níveis), o estado do jogador local e, no
+servidor, `ServerRank` / `ServerOwns` / `ServerGrantRank` / `ServerGrantMount` pelo remetente
+do RPC.
+
+Desde a versão 2, para o **estábulo** do Deadheim (Aesir 20 — guardar/chamar a montaria
+registrada a partir de um ponto fixo): `LocalIsRiding`, `LocalRiddenMountId` (o que guardar),
+`LocalSummon(mountId)` e `LocalDismount()` (chamar/guardar de volta). São só atalhos para o
+mesmo invocar/desmontar do item/H — a posse, a habilidade e o passe de chefe continuam sendo
+conferidos do jeito de sempre, então o estábulo não dá nada que o jogador já não tivesse.
+
+## Cosméticos do jogador (Aesir 28 e 30, VIP)
+
+Quem **possui** uma montaria (`RiderServer`) pode, no menu *Montarias* (U), com ela
+selecionada:
+
+- **Nome** (Aesir 28): um nome visível para todo mundo acima da montaria, em vez do nome
+  padrão da config. Guardado por personagem e por montaria na própria ficha do servidor
+  (`cavaleiros/<personagem>-<conta>.txt`, linhas `name_<id>=...`).
+- **Skin** (Aesir 30): um tingimento cosmético (mesmos stats) escolhido entre as opções que o
+  admin configurou para aquela montaria (`[Montaria<id>] Skins`). Guardado do mesmo jeito
+  (`skin_<id>=...`).
+
+Os dois são exclusivos de VIP por padrão (`NomeMontariaSoVip` / `SkinMontariaSoVip`,
+`[Cosmeticos]`) e podem ser desligados inteiramente (`NomeMontariaAtivo` /
+`SkinMontariaAtivo`). O servidor confere posse e VIP a cada pedido
+(`RiderNet.ActionSetName/ActionSetSkin`); a integração com `VipList.dll` é por reflexão
+(`Integration/VipProvider.cs`, mesmo padrão do `GuildsClanProvider`/`VipProvider` do Velas),
+então sem o VipList instalado ninguém passa a checagem de VIP.
+
+**Como aparece para os outros jogadores:** o nome/skin escolhidos ficam gravados no ZDO da
+montaria no momento em que ela é invocada (o próprio dono grava, já aprovado pelo servidor),
+e todo cliente que a vê lê o mesmo ZDO — por isso aparecem iguais para todo mundo, sem RPC
+novo por invocação. **Limite conhecido:** como o resto da economia deste mod (gold pago no
+cliente no Mestre das Montarias, por exemplo), um cliente modificado poderia escrever outro
+valor nesse campo e mostrar um nome/skin não aprovado aos outros — aceitável aqui porque é
+puramente cosmético (sem vantagem de combate) e seguindo o mesmo nível de confiança que o
+resto do mod já usa.
+
+A skin (tingimento) é aplicada por `MaterialPropertyBlock` em cima do material, sem alterar o
+asset compartilhado; no modelo próprio da Capivara (`.skin`/`.png`) o resultado é certo, nas
+montarias que ainda usam a malha vanilla (Neck, Deer, Boar, Eikthyr, Moder) o efeito depende
+de o shader da criatura aceitar `_Color`/`_BaseColor`/`_TintColor` — testar no jogo.
 
 ## Configuração
 
@@ -84,11 +124,14 @@ por reflexão: catálogo (montarias, níveis), o estado do jogador local e, no s
 - `[Montaria<id>]`: `Nome`, `VelocidadeCorrida`, `VelocidadeAndar`, `AlturaPulo`,
   `Escala`, `PrefabSela`, `SelaOffsetX/Y/Z`, `SelaRotacaoX/Y/Z` (graus; `Y` gira a sela
   sobre as costas), `AberturaPernas` (graus; `0` desativa), `CastSegundos`,
-  `HabilidadeMinima`, `PasseExigido`; nas que voam, `VelocidadeVoo` e
+  `HabilidadeMinima`, `PasseExigido`, `Skins` (Aesir 30: `Nome:#RRGGBB` separados por `|`;
+  "Padrao" sem tingimento sempre existe); nas que voam, `VelocidadeVoo` e
   `VelocidadeVooCorrida`.
 - `[Habilidade]`: `Niveis`.
 - `[Voo]`: `AlturaMaximaVoo` (metros acima do chão ou da água), `VelocidadeSubida`.
 - `[Geral]`: `LockConfig`, `LiberarTodasGratis`, `DerrubarAoTomarHit`, `TeclaMenu`, `TeclaInvocar`.
+- `[Cosmeticos]`: `NomeMontariaAtivo`, `NomeMontariaSoVip`, `NomeMontariaTamanho` (Aesir 28);
+  `SkinMontariaAtivo`, `SkinMontariaSoVip` (Aesir 30).
 
 Servidor e clientes precisam estar na mesma versão do mod.
 

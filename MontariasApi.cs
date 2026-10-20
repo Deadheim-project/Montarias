@@ -1,6 +1,7 @@
 using System.IO;
 using System.Linq;
 using BepInEx;
+using ValheimMontarias.Prefabs;
 
 namespace ValheimMontarias
 {
@@ -18,7 +19,11 @@ namespace ValheimMontarias
     /// </summary>
     public static class MontariasApi
     {
-        public const int Version = 1;
+        /// <summary>Version 2 added the "estábulo" section (LocalIsRiding/LocalRiddenMountId/
+        /// LocalSummon/LocalDismount) for Deadheim's stable (Aesir 20): a fixed point where a
+        /// player stores or calls back the mount registered to them. Everything else from
+        /// version 1 is unchanged.</summary>
+        public const int Version = 2;
 
         // ---- catalog (any side; from the server's synchronized config) ----
 
@@ -75,5 +80,48 @@ namespace ValheimMontarias
 
         public static string ServerGrantMount(long sender, string mountId, string why) =>
             RiderServer.GrantMount(sender, mountId, string.IsNullOrEmpty(why) ? "outro mod" : why);
+
+        // ---- estábulo (Deadheim, Aesir 20) ----
+        //
+        // Guardar/chamar a montaria de um ponto fixo não precisa de protocolo novo: é só
+        // disparar o mesmo invocar/desmontar que o item e o H já fazem, a partir de onde quer
+        // que o Deadheim decida (um gatilho de proximidade, uma interação no estábulo...).
+        // A posse, a habilidade e o passe de chefe continuam sendo os de sempre (LocalOwns,
+        // ServerOwns, MountRequiredRank) -- o estábulo não dá nada que o jogador não tivesse.
+
+        /// <summary>Se o jogador local está montado em uma das nossas montarias agora.</summary>
+        public static bool LocalIsRiding() => MountControl.IsRiding(Player.m_localPlayer);
+
+        /// <summary>O id da montaria que o jogador local está usando agora, ou "" se não
+        /// estiver montado (para o estábulo saber o que guardar).</summary>
+        public static string LocalRiddenMountId()
+        {
+            if (!MountControl.TryGetRidden(Player.m_localPlayer, out var mount, out _, out _) || mount == null)
+                return "";
+            return MountSettings.Find(mount.gameObject)?.Id ?? "";
+        }
+
+        /// <summary>Invoca a montaria (mesmo fluxo do item/H: conjuração, checagens de posse/
+        /// habilidade/passe, mensagem ao jogador se algo faltar). "" ou um id desconhecido usa
+        /// a montaria padrão. Sempre true (o pedido foi aceito); o resultado chega pela
+        /// mensagem central do jogo, como qualquer invocação.</summary>
+        public static bool LocalSummon(string mountId)
+        {
+            var player = Player.m_localPlayer;
+            if (player == null) return false;
+            var profile = MountSettings.ById(mountId) ?? MountSettings.Default;
+            if (profile == null) return false;
+            MountControl.TrySummonProfile(player, profile);
+            return true;
+        }
+
+        /// <summary>Desmonta (se estiver montado) e a montaria some, como o item/H fazem.</summary>
+        public static bool LocalDismount()
+        {
+            var player = Player.m_localPlayer;
+            if (player == null) return false;
+            MountControl.Dismount(player);
+            return true;
+        }
     }
 }
