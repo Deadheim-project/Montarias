@@ -16,7 +16,7 @@ namespace ValheimMontarias
     {
         public const string Guid = "com.valheimmontarias.mod";
         public const string Name = "ValheimMontarias";
-        public const string Version = "0.3.25";
+        public const string Version = "0.3.26";
 
         internal static ManualLogSource Log;
         private Harmony _harmony;
@@ -118,6 +118,8 @@ namespace ValheimMontarias
             _consoleWasEnabled = Console.instance != null && Console.instance.IsConsoleEnabled();
             if (Input.GetKeyDown(KeyCode.F8))
                 AdminMenu.Toggle();
+            if (Input.GetKeyDown(KeyCode.F9) && (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)))
+                MountPhotos.Run(null);
             AdminMenu.Tick();
             MountControl.Tick(Player.m_localPlayer);
         }
@@ -125,10 +127,13 @@ namespace ValheimMontarias
         private void LateUpdate()
         {
             RescueConsole();
-            var player = Player.m_localPlayer;
-            if (player != null && player.gameObject.activeInHierarchy
-                && player.GetComponent<RiderVisualFix>() == null)
-                player.gameObject.AddComponent<RiderVisualFix>();
+            // Every player, not only ours: the legs of whoever rides are laid on each client.
+            foreach (var player in Player.GetAllPlayers())
+            {
+                if (player != null && player.gameObject.activeInHierarchy
+                    && !player.TryGetComponent<RiderVisualFix>(out _))
+                    player.gameObject.AddComponent<RiderVisualFix>();
+            }
         }
 
         private void OnGUI()

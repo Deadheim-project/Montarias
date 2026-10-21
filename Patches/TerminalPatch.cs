@@ -12,6 +12,13 @@ namespace ValheimMontarias.Patches
             {
                 MountMenu.Open();
             });
+            _ = new Terminal.ConsoleCommand("montarias_fotos", "[id ...] (admin) photographs the rider on each mount", args =>
+            {
+                var ids = new System.Collections.Generic.List<string>();
+                for (int i = 1; i < args.Args.Length; i++)
+                    ids.Add(args.Args[i].Trim().ToLowerInvariant());
+                Prefabs.MountPhotos.Run(ids);
+            });
         }
     }
 }

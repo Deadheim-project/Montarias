@@ -16,8 +16,11 @@ namespace ValheimMontarias
         private const BindingFlags Any = BindingFlags.Instance | BindingFlags.Static
             | BindingFlags.Public | BindingFlags.NonPublic;
 
-        private static readonly Dictionary<string, FieldInfo> Fields = new Dictionary<string, FieldInfo>();
-        private static readonly Dictionary<string, MethodInfo> Methods = new Dictionary<string, MethodInfo>();
+        // Keyed by type and name, not by a "Type.name" string: these are read every frame, and
+        // building the key allocated a string per call.
+        private static readonly Dictionary<(Type, string), FieldInfo> Fields = new Dictionary<(Type, string), FieldInfo>();
+        private static readonly Dictionary<(Type, string, int), MethodInfo> Methods = new Dictionary<(Type, string, int), MethodInfo>();
+        private static readonly object[] NoArgs = new object[0];
 
         public static void Set(object target, string field, object value)
         {
@@ -70,7 +73,7 @@ namespace ValheimMontarias
             if (info == null) return null;
             try
             {
-                return info.Invoke(target, args);
+                return info.Invoke(target, args != null && args.Length == 0 ? NoArgs : args);
             }
             catch (Exception e)
             {
@@ -269,7 +272,7 @@ namespace ValheimMontarias
         {
             if (target == null) return null;
             var type = target.GetType();
-            string key = type.FullName + "." + name;
+            var key = (type, name);
             if (Fields.TryGetValue(key, out var cached))
                 return cached;
             FieldInfo info = null;
@@ -281,7 +284,7 @@ namespace ValheimMontarias
 
         private static MethodInfo Method(Type type, string name, int argc)
         {
-            string key = type.FullName + "." + name + "." + argc;
+            var key = (type, name, argc);
             if (Methods.TryGetValue(key, out var cached))
                 return cached;
             MethodInfo match = null;

@@ -718,7 +718,20 @@ namespace ValheimMontarias
             AddStat("Velocidade", selected.RunSpeed, 3f, 30f);
             AddStat("Pulo", selected.JumpHeight, 3f, 20f);
             AddStat("Escala", selected.Scale, 0.5f, 3f);
-            AddStat("Abertura das pernas (graus)", selected.LegSpread, 0f, 45f);
+            AddChoice("Pose montado", selected.RidePose, MountSettings.RidePoses);
+            AddStat("Ajuste da sela: altura (m)", selected.SaddleUp, -2f, 2f);
+            AddStat("Ajuste da sela: frente (m)", selected.SaddleForward, -2f, 2f);
+            AddStat("Assento: recuo no lombo (m)", selected.SeatBack, -1.5f, 1.5f);
+            AddStat("Tamanho da sela (x)", selected.SaddleSize, 0.3f, 3f);
+            AddStat("Ajuste do personagem: altura (m)", selected.RiderUp, -2f, 2f);
+            AddStat("Ajuste do personagem: frente (m)", selected.RiderForward, -2f, 2f);
+            AddStat("Folga das pernas (m)", selected.LegGap, -0.2f, 0.5f);
+            AddStat("Pose: joelho à frente (graus)", selected.KneeForward, -30f, 90f);
+            AddStat("Pose: coxas abertas (graus)", selected.ThighOut, 0f, 85f);
+            AddStat("Pose: canela para trás (graus)", selected.ShinBack, -60f, 60f);
+            AddStat("Pose: inclinação do tronco (graus)", selected.Lean, -30f, 60f);
+            AddStat("Pose: mãos à frente (m)", selected.HandsForward, -1f, 1.5f);
+            AddStat("Pose: mãos acima do assento (m)", selected.HandsUp, -1f, 1.5f);
             AddStat("Rotação da sela (graus)", selected.SaddleYRotation, -360f, 360f);
             AddIntStat("Habilidade exigida (nível)", selected.RequiredRank, 1, Mathf.Max(1, RidingRanks.Count));
 
@@ -746,9 +759,9 @@ namespace ValheimMontarias
         private void AddStat(string label, ConfigEntry<float> entry, float min, float max)
         {
             if (entry == null) return;
-            Heading($"{label}: {entry.Value:0.0}");
+            Heading($"{label}: {entry.Value:0.0#}");
             var row = Row(_adminEditor, 40f);
-            var field = ValheimUi.CreateInputField(row, entry.Value.ToString("0.0", CultureInfo.InvariantCulture), 100f, 38f);
+            var field = ValheimUi.CreateInputField(row, entry.Value.ToString("0.0#", CultureInfo.InvariantCulture), 100f, 38f);
             Flexible(field.gameObject);
             var save = ValheimUi.CreateButton(row, "OK", 70f, 38f, 14);
             save.onClick.AddListener(() =>
@@ -760,9 +773,29 @@ namespace ValheimMontarias
                     return;
                 }
                 entry.Value = Mathf.Clamp(value, min, max);
-                field.text = entry.Value.ToString("0.0", CultureInfo.InvariantCulture);
-                Say($"{label} = {entry.Value:0.0}");
+                field.text = entry.Value.ToString("0.0#", CultureInfo.InvariantCulture);
+                Say($"{label} = {entry.Value:0.0#}");
             });
+        }
+
+        /// <summary>One button per option; the current one is lit. Applies at once.</summary>
+        private void AddChoice(string label, ConfigEntry<string> entry, string[] options)
+        {
+            if (entry == null) return;
+            Heading($"{label}: {entry.Value}");
+            var row = Row(_adminEditor, 40f);
+            foreach (var option in options)
+            {
+                var button = ValheimUi.CreateButton(row, option, 110f, 38f, 14);
+                if (button.image != null && !string.Equals(entry.Value, option, System.StringComparison.OrdinalIgnoreCase))
+                    button.image.color = new Color(0.72f, 0.72f, 0.72f, 1f);
+                button.onClick.AddListener(() =>
+                {
+                    entry.Value = option;
+                    Say($"{label} = {option}");
+                    RebuildAdmin();
+                });
+            }
         }
 
         private void AddIntStat(string label, ConfigEntry<int> entry, int min, int max)

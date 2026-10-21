@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace ValheimMontarias.Prefabs
@@ -12,6 +13,84 @@ namespace ValheimMontarias.Prefabs
     public class MountControl : MonoBehaviour
     {
         public const string OwnerKey = "javali_owner";
+        private static readonly int OwnerHash = OwnerKey.GetStableHashCode();
+
+        /// <summary>Every mount in the scene, in the order they were created (the order of
+        /// Character.GetAllCharacters). Who rides what is asked every frame for every player in
+        /// sight; walking the whole Character list for it, with a component lookup and a name
+        /// string per character, cost every client its frame rate in a crowd.</summary>
+        internal static readonly List<MountControl> Live = new List<MountControl>();
+
+        private Character _character;
+        private ZNetView _nview;
+        private Sadle _sadle;
+        private float _nextSadleSearch;
+        private MountSaddleAnchor _anchor;
+        private float _nextAnchorSearch;
+        private MountProfile _profile;
+        private MountProfile[] _profileFrom;
+
+        internal Character Character => _character != null ? _character : (_character = GetComponent<Character>());
+
+        internal ZNetView NView => _nview != null ? _nview : (_nview = GetComponent<ZNetView>());
+
+        /// <summary>The saddle's Sadle (part of the prefab); looked for again at most every
+        /// 0.25 s while missing.</summary>
+        internal Sadle Sadle
+        {
+            get
+            {
+                if (_sadle == null && Time.unscaledTime >= _nextSadleSearch)
+                {
+                    _sadle = GetComponentInChildren<Sadle>(true);
+                    if (_sadle == null) _nextSadleSearch = Time.unscaledTime + 0.25f;
+                }
+                return _sadle;
+            }
+        }
+
+        /// <summary>This mount's profile; found again only when the profile list is rebuilt.</summary>
+        internal MountProfile Profile
+        {
+            get
+            {
+                var all = MountSettings.All;
+                if (!ReferenceEquals(_profileFrom, all))
+                {
+                    _profileFrom = all;
+                    _profile = MountSettings.FindByName(gameObject);
+                }
+                return _profile;
+            }
+        }
+
+        /// <summary>The saddle's anchor once it has a seat, or null. A saddle rebuilt by
+        /// MountGear.Attach destroys the old one, which is looked for again at once; a saddle
+        /// still without a seat is looked for again at most every 0.2 s.</summary>
+        internal MountSaddleAnchor SaddleAnchor
+        {
+            get
+            {
+                if (_anchor != null && _anchor.Seat != null) return _anchor;
+                bool destroyed = !ReferenceEquals(_anchor, null) && _anchor == null;
+                if (!destroyed && Time.unscaledTime < _nextAnchorSearch) return null;
+                var saddle = MountGear.FindSaddle(gameObject);
+                _anchor = saddle != null ? saddle.GetComponent<MountSaddleAnchor>() : null;
+                if (_anchor != null && _anchor.Seat != null) return _anchor;
+                _nextAnchorSearch = Time.unscaledTime + 0.2f;
+                return null;
+            }
+        }
+
+        protected virtual void Awake()
+        {
+            Live.Add(this);
+        }
+
+        protected virtual void OnDestroy()
+        {
+            Live.Remove(this);
+        }
 
         protected virtual void Start()
         {
@@ -31,7 +110,7 @@ namespace ValheimMontarias.Prefabs
                 return;
             }
 
-            var nview = GetComponent<ZNetView>();
+            var nview = NView;
             if (nview == null || !nview.IsValid() || !nview.IsOwner()) return;
             if (IsRidden()) return;
             var local = Player.m_localPlayer;
@@ -62,7 +141,7 @@ namespace ValheimMontarias.Prefabs
                     Access.Get(local, "m_attachPoint") is Transform point && point != null &&
                     point.IsChildOf(transform)) return true;
             }
-            return Access.HaveRider(GetComponentInChildren<Sadle>(true));
+            return Access.HaveRider(Sadle);
         }
 
         protected void InitPet()
@@ -83,7 +162,7 @@ namespace ValheimMontarias.Prefabs
         {
             var nview = go != null ? go.GetComponent<ZNetView>() : null;
             if (nview == null || !nview.IsValid()) return 0L;
-            return nview.GetZDO().GetLong(OwnerKey.GetStableHashCode(), 0L);
+            return nview.GetZDO().GetLong(OwnerHash, 0L);
         }
 
         public static bool IsOwner(GameObject go, Player player)
@@ -97,7 +176,7 @@ namespace ValheimMontarias.Prefabs
         {
             var nview = go != null ? go.GetComponent<ZNetView>() : null;
             if (player == null || nview == null || !nview.IsValid()) return;
-            nview.GetZDO().Set(OwnerKey.GetStableHashCode(), player.GetPlayerID());
+            nview.GetZDO().Set(OwnerHash, player.GetPlayerID());
         }
 
         public static GameObject FindOwned(Player player)
@@ -109,8 +188,9 @@ namespace ValheimMontarias.Prefabs
         {
             if (player == null) return null;
             long id = player.GetPlayerID();
-            foreach (var character in Character.GetAllCharacters())
+            for (int i = 0; i < Live.Count; i++)
             {
+                var character = Live[i].Character;
                 if (character == null || character.IsDead()) continue;
                 if (isOurs != null && !isOurs(character.gameObject)) continue;
                 if (OwnerId(character.gameObject) == id)
@@ -160,6 +240,18 @@ namespace ValheimMontarias.Prefabs
             if (player == null) return;
             ClearWhistleTargetMode(player);
             ClearOrphanedRide(player);
+            DismountInWater(player);
+        }
+
+        /// <summary>Swimming (the rider, or the mount carrying them) throws the rider off.</summary>
+        private static void DismountInWater(Player player)
+        {
+            if (!TryGetRidden(player, out var mount, out _, out _)) return;
+            if (player.IsSwimming() || (mount != null && mount.IsSwimming() && !mount.IsFlying()))
+            {
+                Dismount(player);
+                player.Message(MessageHud.MessageType.Center, "Você não pode montar na água.");
+            }
         }
 
         private static void ClearWhistleTargetMode(Player player)
@@ -295,7 +387,7 @@ namespace ValheimMontarias.Prefabs
         private static void TickCast(Player player)
         {
             if (!_casting) return;
-            if (player == null || player.IsDead() || CombatLock.IsInCombat(player) || CastInterrupted(player))
+            if (player == null || player.IsDead() || CombatLock.IsInCombat(player) || player.IsEncumbered() || CastInterrupted(player))
             {
                 CancelCast(player, "Invocação interrompida");
                 return;
@@ -406,7 +498,7 @@ namespace ValheimMontarias.Prefabs
                 return;
             }
 
-            if (player != null && !player.IsDead() && !CombatLock.IsInCombat(player))
+            if (player != null && !player.IsDead() && !CombatLock.IsInCombat(player) && !player.IsEncumbered())
             {
                 if (!IsRiding(player)) AttachNow(go, player);
                 if (IsRiding(player))
@@ -428,7 +520,7 @@ namespace ValheimMontarias.Prefabs
             Despawn(go);
             if (player != null && !player.IsDead())
                 player.Message(MessageHud.MessageType.Center,
-                    CombatLock.IsInCombat(player) ? CombatLock.Message : "Não foi possível montar aqui.");
+                    CombatLock.IsInCombat(player) ? CombatLock.Message : player.IsEncumbered() ? CombatLock.HeavyMessage : "Não foi possível montar aqui.");
         }
 
         /// <summary>
@@ -646,22 +738,23 @@ namespace ValheimMontarias.Prefabs
             controller = Access.GetDoodad(player);
             if (player == null) return false;
 
-            foreach (var character in Character.GetAllCharacters())
+            for (int i = 0; i < Live.Count; i++)
             {
+                var live = Live[i];
+                var character = live.Character;
                 if (character == null || character.IsDead()) continue;
-                if (!character.gameObject.activeInHierarchy) continue;
-                if (!MountHub.IsOurs(character.gameObject)) continue;
-                var sadle = character.GetComponentInChildren<Sadle>(true);
+                if (!live.gameObject.activeInHierarchy) continue;
+                var sadle = live.Sadle;
                 bool ridden = Access.HaveRider(sadle);
                 if (!ridden && player.transform.IsChildOf(character.transform))
                     ridden = true;
                 if (!ridden) continue;
 
                 mount = character;
-                pet = character.GetComponent<MountControl>();
+                pet = live;
                 if (controller == null)
                     controller = sadle;
-                return pet != null;
+                return true;
             }
 
             if (controller == null) return false;
@@ -684,6 +777,35 @@ namespace ValheimMontarias.Prefabs
         public static bool IsRiding(Player player)
         {
             return TryGetRidden(player, out _, out _, out _);
+        }
+
+        /// <summary>The mount of ours a player rides, or null. The local player through the
+        /// saddle they control; anyone else through the saddle's user in its ZDO, which is all
+        /// another client knows of them.</summary>
+        public static Character RiddenBy(Player player)
+        {
+            if (player == null) return null;
+            if (player == Player.m_localPlayer)
+                return TryGetRidden(player, out var ridden, out _, out _) ? ridden : null;
+            long id = player.GetPlayerID();
+            if (id == 0L) return null;
+            for (int i = 0; i < Live.Count; i++)
+            {
+                var character = Live[i].Character;
+                if (character == null || character.IsDead()) continue;
+                var nview = Live[i].NView;
+                if (nview != null && nview.IsValid() && nview.GetZDO().GetLong(ZDOVars.s_user, 0L) == id)
+                    return character;
+            }
+            return null;
+        }
+
+        /// <summary>The rider's pose on this mount (its saddle's attach animation).</summary>
+        public static string PoseOf(Character mount)
+        {
+            if (mount == null) return null;
+            var sadle = mount.TryGetComponent(out MountControl live) ? live.Sadle : mount.GetComponentInChildren<Sadle>(true);
+            return sadle != null ? Access.Get(sadle, "m_attachAnimation") as string : null;
         }
 
         private static bool _wasRiding;
@@ -786,7 +908,6 @@ namespace ValheimMontarias.Prefabs
                 MountHub.KeepHumanScale(player);
             }
 
-            MountHub.FitSeat(mount.gameObject);
             MountHub.KeepHumanScale(player);
 
             // Walking and running are read by the mount's own AI (MountAi_UpdateAI_Patch);
@@ -861,7 +982,7 @@ namespace ValheimMontarias.Prefabs
         private const float TakeOffClimbSeconds = 0.8f;
         private const float TakeOffAnimationLimit = 4f;
 
-        private static void TakeOff(Character mount)
+        internal static void TakeOff(Character mount)
         {
             _climbUntil = 0f;
             _climbPendingUntil = Time.time + TakeOffAnimationLimit;
@@ -896,7 +1017,7 @@ namespace ValheimMontarias.Prefabs
                 return;
             }
 
-            float vertical = 0f;
+            float vertical = TestVertical;
             if (Access.ButtonHeld("Jump") || Access.ButtonHeld("JoyJump") || Input.GetKey(KeyCode.Space))
                 vertical += 1f;
             if (Access.ButtonHeld("Crouch") || Access.ButtonHeld("JoyCrouch") || Input.GetKey(KeyCode.LeftControl))
@@ -930,8 +1051,14 @@ namespace ValheimMontarias.Prefabs
 
             if (stick.z > 0.5f) ai.LookTowards(flat);
             mount.SetMoveDir(move);
-            mount.SetRun(Access.RunHeld());
+            mount.SetRun(Access.RunHeld() || TestRun);
         }
+
+        /// <summary>Keys held for the rider by the admin's photo test (MountPhotos): the stick
+        /// (null = the real keys), Shift, and Space/Ctrl in flight (+1/-1).</summary>
+        internal static Vector3? TestStick;
+        internal static bool TestRun;
+        internal static float TestVertical;
 
         /// <summary>What the Moder flies above: the ground, or the sea when that is higher.</summary>
         private static float FlightFloor(Vector3 pos, out bool overWater)
@@ -968,7 +1095,13 @@ namespace ValheimMontarias.Prefabs
         {
             stick = Vector3.zero;
             player = Player.m_localPlayer;
-            if (player == null || player.IsDead() || AdminMenu.IsOpen) return false;
+            if (player == null || player.IsDead()) return false;
+            if (TestStick.HasValue)
+            {
+                stick = TestStick.Value;
+                return TryGetRidden(player, out var tested, out _, out _) && tested != null && tested.gameObject == mount;
+            }
+            if (AdminMenu.IsOpen) return false;
             // Character.TakeInput is protected in the live assembly; go through reflection.
             if (Access.Call(player, "TakeInput") is bool takeInput && !takeInput) return false;
             if (!TryGetRidden(player, out var ridden, out _, out _) || ridden == null || ridden.gameObject != mount)
@@ -987,7 +1120,7 @@ namespace ValheimMontarias.Prefabs
             dir.y = 0f;
             if (dir.sqrMagnitude < 0.0001f) dir = player.transform.forward;
             dir.Normalize();
-            run = Access.RunHeld();
+            run = Access.RunHeld() || TestRun;
             return true;
         }
 

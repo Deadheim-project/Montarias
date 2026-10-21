@@ -190,7 +190,31 @@ namespace ValheimMontarias.Prefabs
             if (go == null) return;
             var profile = MountSettings.Find(go) ?? MountSettings.Default;
             ApplyMoveSpeed(go.GetComponent<Character>(), profile);
+            ApplyRidePose(go, profile);
             ApplyScale(go, profile);
+        }
+
+        /// <summary>The rider's pose on this mount (PoseMontado). The local player already on
+        /// it switches right away, so the admin can compare poses without getting off.</summary>
+        public static void ApplyRidePose(GameObject go, MountProfile profile)
+        {
+            var sadle = go != null ? go.GetComponentInChildren<Sadle>(true) : null;
+            if (sadle == null) return;
+            string anim = MountGear.RideAnimation(profile);
+            Access.Set(sadle, "m_attachAnimation", anim);
+
+            var player = Player.m_localPlayer;
+            if (player == null || !(Access.Get(player, "m_attachPoint") is Transform point) || point == null
+                || !point.IsChildOf(go.transform))
+                return;
+            var current = Access.Get(player, "m_attachAnimation") as string;
+            if (current == anim) return;
+            // m_zanim is protected in the live assembly; SetBool itself is public.
+            if (!(Access.Get(player, "m_zanim") is ZSyncAnimation zanim) || zanim == null) return;
+            if (!string.IsNullOrEmpty(current))
+                zanim.SetBool(current, false);
+            zanim.SetBool(anim, true);
+            Access.Set(player, "m_attachAnimation", anim);
         }
 
         public static void ApplyInfiniteStamina(GameObject go)
@@ -220,7 +244,20 @@ namespace ValheimMontarias.Prefabs
             if (target != null)
             {
                 ApplyMoveSpeed(target.GetComponent<Character>(), profile);
+                ApplyRidePose(target, profile);
                 ApplyScale(target, profile);
+            }
+        }
+
+        /// <summary>Puts the saddle and the seat of every summoned mount of this profile back on
+        /// the posed body, after one of the fine adjustments changed.</summary>
+        public static void RefitProfile(MountProfile profile)
+        {
+            if (profile == null) return;
+            foreach (var character in Character.GetAllCharacters())
+            {
+                if (character == null || MountSettings.Find(character.gameObject) != profile) continue;
+                MountGear.Refit(character.gameObject);
             }
         }
 
@@ -313,6 +350,7 @@ namespace ValheimMontarias.Prefabs
         public static bool IsOurs(GameObject go)
         {
             if (go == null) return false;
+            if (go.TryGetComponent<MountControl>(out _)) return true;
             if (MountSettings.All != null)
             {
                 for (int i = 0; i < MountSettings.All.Length; i++)
@@ -322,8 +360,7 @@ namespace ValheimMontarias.Prefabs
                         return true;
                 }
             }
-            return go.name.StartsWith(PrefabName, StringComparison.Ordinal)
-                || go.GetComponent<MountControl>() != null;
+            return go.name.StartsWith(PrefabName, StringComparison.Ordinal);
         }
 
         public static void Register(ZNetScene scene)
@@ -577,6 +614,7 @@ namespace ValheimMontarias.Prefabs
             Access.Set(sadle, "m_character", character);
             Access.Set(sadle, "m_tameable", tame);
             Access.Set(sadle, "m_attachPoint", attach);
+            // Only until ApplyRidePose puts the profile's riding pose on it.
             Access.Set(sadle, "m_attachAnimation", "attach_chair");
             // Sadle only counts its rider while their position is this close to the mount's root:
             // on the Moder the seat is far above it, and in flight the rider was dropped and the

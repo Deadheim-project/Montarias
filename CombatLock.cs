@@ -40,8 +40,19 @@ namespace ValheimMontarias
 
         public static bool Block(Player player)
         {
-            if (!IsInCombat(player)) return false;
+            if (!IsInCombat(player))
+                return BlockHeavy(player);
             player.Message(MessageHud.MessageType.Center, Message);
+            return true;
+        }
+
+        public const string HeavyMessage = "Você está pesado demais para montar.";
+
+        /// <summary>Over the carry limit (the game's own Encumbered state): no mounting.</summary>
+        public static bool BlockHeavy(Player player)
+        {
+            if (player == null || !player.IsEncumbered()) return false;
+            player.Message(MessageHud.MessageType.Center, HeavyMessage);
             return true;
         }
     }

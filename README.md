@@ -44,7 +44,9 @@ Como no WoW, **não existe montaria vazia**:
   - *Montarias*: todas as montarias, o que falta para cada uma, **Montar**, **Usar no H** e
     **Pegar o item**;
   - *Habilidade*: o seu nível e os próximos;
-  - *Admin* (só admin): stats de cada montaria e a sua própria ficha no servidor.
+  - *Admin* (só admin): stats de cada montaria (inclusive a pose montado e os ajustes finos
+    de sela, personagem e pernas, que mudam na hora mesmo já montado) e a sua própria ficha
+    no servidor.
 - Montado: **Espaço** salta, **clique** dá uma investida.
 - **Moder (voa):** **Espaço** decola e, no ar, sobe; **Ctrl** desce e, perto do chão
   firme, pousa; para frente ela vai para onde a câmera olha (subindo ou descendo junto);
@@ -122,8 +124,12 @@ de o shader da criatura aceitar `_Color`/`_BaseColor`/`_TintColor` — testar no
 (`LockConfig = true`):
 
 - `[Montaria<id>]`: `Nome`, `VelocidadeCorrida`, `VelocidadeAndar`, `AlturaPulo`,
-  `Escala`, `PrefabSela`, `SelaOffsetX/Y/Z`, `SelaRotacaoX/Y/Z` (graus; `Y` gira a sela
-  sobre as costas), `AberturaPernas` (graus; `0` desativa), `CastSegundos`,
+  `Escala`, `PrefabSela`, `SelaRotacaoX/Y/Z` (graus; `Y` gira a sela sobre as costas),
+  `PoseMontado` (`Lox`: ereto, pernas bem abertas; `Asksvin`: inclinado para a frente,
+  pernas mais fechadas -- as poses de montar das selas desses bichos do jogo, lidas delas;
+  `Cadeira`: a pose sentada antiga, com as mãos nos joelhos; ou o nome de uma animação
+  `attach_` do jogador), os ajustes finos em metros `AjusteSelaAltura`, `AjusteSelaFrente`,
+  `AjustePersonagemAltura`, `AjustePersonagemFrente` e `FolgaPernas` (veja *Encaixe*), `CastSegundos`,
   `HabilidadeMinima`, `PasseExigido`, `Skins` (Aesir 30: `Nome:#RRGGBB` separados por `|`;
   "Padrao" sem tingimento sempre existe); nas que voam, `VelocidadeVoo` e
   `VelocidadeVooCorrida`.
@@ -134,6 +140,26 @@ de o shader da criatura aceitar `_Color`/`_BaseColor`/`_TintColor` — testar no
   `SkinMontariaAtivo`, `SkinMontariaSoVip` (Aesir 30).
 
 Servidor e clientes precisam estar na mesma versão do mod.
+
+### Encaixe de sela, personagem e pernas
+
+Tudo se encaixa sozinho em cada montaria, na pose em que ela está (`MountGear.SitOnPosedBack`
+e `RiderVisualFix`), alguns quadros depois de ela aparecer e de novo ao decolar ou pousar:
+
+- **Sela:** sobre as costas, no meio do corpo (acima da raiz da montaria). A altura é a
+  primeira superfície acima do osso do tronco mais próximo (`Spine`, `Pelvis`...): asa
+  dobrada por cima, galhada e ponta de espinho ficam de fora.
+- **Personagem:** o quadril vai no meio do assento (o fundo da sela, entre a frente e a
+  traseira), descontando onde cada pose põe o quadril (a do Lox, meio metro atrás da raiz).
+  O cliente de quem monta confere isso no próprio esqueleto e corrige se for diferente.
+- **Pernas:** as coxas giram até os joelhos ficarem a `FolgaPernas` dos flancos, e a canela
+  mantém o ângulo da pose. Vale também para os outros jogadores montados que você vê.
+
+Os ajustes finos (`AjusteSela*`, `AjustePersonagem*`, `FolgaPernas`) só empurram esse
+resultado. As chaves antigas `AlturaAssento`, `AssentoOffsetX/Z`, `SelaOffsetX/Y/Z` e
+`AberturaPernas` eram compensações da lógica anterior e não são mais lidas (podem ser
+apagadas do cfg). Cada montada deixa no log uma linha `rider on ...` com a altura do quadril
+sobre o assento e a distância dos joelhos aos flancos.
 
 ## Compilar
 
