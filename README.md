@@ -135,7 +135,10 @@ de o shader da criatura aceitar `_Color`/`_BaseColor`/`_TintColor` — testar no
   `VelocidadeVooCorrida`.
 - `[Habilidade]`: `Niveis`.
 - `[Voo]`: `AlturaMaximaVoo` (metros acima do chão ou da água), `VelocidadeSubida`.
-- `[Geral]`: `LockConfig`, `LiberarTodasGratis`, `DerrubarAoTomarHit`, `TeclaMenu`, `TeclaInvocar`.
+- `[Geral]`: `LockConfig`, `LiberarTodasGratis`, `DerrubarAoTomarHit`, `AtalhoMenu`, `AtalhoAdmin`, `AtalhoFotos`.
+  Desde a 0.3.27 os atalhos vêm vazios: o menu abre pela Central Deadheim (Tab, ao lado do inventário)
+  e a aba de admin em ESC > Deadheim > Admin. Quem quiser uma tecla define o atalho aqui (era `TeclaMenu` = U,
+  F8 e Ctrl+F9 fixos no código).
 - `[Cosmeticos]`: `NomeMontariaAtivo`, `NomeMontariaSoVip`, `NomeMontariaTamanho` (Aesir 28);
   `SkinMontariaAtivo`, `SkinMontariaSoVip` (Aesir 30).
 

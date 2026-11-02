@@ -4,7 +4,7 @@ namespace ValheimMontarias
 {
     /// <summary>
     /// Admin editing now lives as a tab inside the U menu. These methods keep older
-    /// call sites (E na montaria, F8, RideStick) working.
+    /// call sites (E na montaria, AtalhoAdmin, aba Admin do Deadheim, RideStick) working.
     /// </summary>
     internal static class AdminMenu
     {

@@ -146,6 +146,8 @@ namespace ValheimMontarias
         public static ConfigEntry<bool> LockConfig;
         public static ConfigEntry<bool> UnlockAll;
         public static ConfigEntry<KeyboardShortcut> MenuKey;
+        public static ConfigEntry<KeyboardShortcut> AdminKey;
+        public static ConfigEntry<KeyboardShortcut> PhotosKey;
         public static ConfigEntry<string> RidingRankList;
         public static ConfigEntry<bool> KnockOffOnHit;
         public static ConfigEntry<float> FlyMaxAltitude;
@@ -264,8 +266,15 @@ namespace ValheimMontarias
                 RidingRankList.Value = RidingRanks.Default;
             RidingRankList.SettingChanged += (_, __) => MountHub.ApplySpeedAll();
 
-            MenuKey = plugin.Config.Bind("Geral", "TeclaMenu", new KeyboardShortcut(KeyCode.U),
-                "Abre o menu de montarias.");
+            // 0.3.27: sem tecla por padrao. O menu abre pela Central Deadheim (Tab, ao lado do
+            // inventario) e a aba de admin em ESC > Deadheim > Admin. Os nomes mudaram (TeclaMenu era
+            // U; o F8 e o Ctrl+F9 eram fixos no codigo) para o U gravado num cfg antigo nao voltar.
+            MenuKey = plugin.Config.Bind("Geral", "AtalhoMenu", KeyboardShortcut.Empty,
+                "Tecla que abre o menu de montarias. Vazio = sem tecla (o menu abre pela Central Deadheim, no Tab).");
+            AdminKey = plugin.Config.Bind("Geral", "AtalhoAdmin", KeyboardShortcut.Empty,
+                "So admin: tecla que abre a aba de admin das montarias. Vazio = sem tecla (abre em ESC > Deadheim > Admin).");
+            PhotosKey = plugin.Config.Bind("Geral", "AtalhoFotos", KeyboardShortcut.Empty,
+                "So admin: tecla do teste de fotos das montarias (era Ctrl+F9). Vazio = sem tecla; o comando montarias_fotos continua.");
         }
 
         /// <summary>The riding skill level that lets you fly: a flying mount asks for it by default.</summary>
@@ -280,7 +289,9 @@ namespace ValheimMontarias
         private static string DefaultRidePose(string id) =>
             id == "deer" || id == "eikthyr" || id == "neck" ? "Asksvin" : "Lox";
 
-        public static string MenuKeyName() => MenuKey != null ? MenuKey.Value.MainKey.ToString() : "U";
+        /// <summary>Como as dicas chamam o menu: a tecla, se houver, ou a Central Deadheim (Tab).</summary>
+        public static string MenuKeyName() =>
+            MenuKey != null && MenuKey.Value.MainKey != KeyCode.None ? MenuKey.Value.ToString() : "Central (Tab)";
 
         public static MountProfile ByItem(string itemPrefab)
         {

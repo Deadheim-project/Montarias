@@ -8,7 +8,7 @@ using UnityEngine;
 namespace ValheimMontarias.Prefabs
 {
     /// <summary>
-    /// Admin test (console "montarias_fotos [id ...]", or Ctrl+F9): rides each mount in turn and
+    /// Admin test (console "montarias_fotos [id ...]", or the AtalhoFotos key, empty by default): rides each mount in turn and
     /// photographs rider and saddle from fixed angles -- standing, walking and running, and the
     /// Moder also in the air -- at noon and without the HUD, into
     /// BepInEx/montarias-fotos/&lt;date_time&gt;/. Each mount goes straight ahead a few dozen

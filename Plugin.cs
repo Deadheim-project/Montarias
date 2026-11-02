@@ -16,7 +16,7 @@ namespace ValheimMontarias
     {
         public const string Guid = "com.valheimmontarias.mod";
         public const string Name = "ValheimMontarias";
-        public const string Version = "0.3.26";
+        public const string Version = "0.3.27";
 
         internal static ManualLogSource Log;
         private Harmony _harmony;
@@ -116,9 +116,10 @@ namespace ValheimMontarias
         {
             _consoleWasVisible = Console.IsVisible();
             _consoleWasEnabled = Console.instance != null && Console.instance.IsConsoleEnabled();
-            if (Input.GetKeyDown(KeyCode.F8))
+            // Sem tecla por padrao desde a 0.3.27 (AtalhoAdmin / AtalhoFotos na config).
+            if (MountSettings.AdminKey != null && MountSettings.AdminKey.Value.IsDown())
                 AdminMenu.Toggle();
-            if (Input.GetKeyDown(KeyCode.F9) && (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)))
+            if (MountSettings.PhotosKey != null && MountSettings.PhotosKey.Value.IsDown())
                 MountPhotos.Run(null);
             AdminMenu.Tick();
             MountControl.Tick(Player.m_localPlayer);

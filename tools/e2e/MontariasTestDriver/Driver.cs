@@ -268,7 +268,8 @@ namespace MontariasTestDriver
             Check("api/npcvalheim-acha-o-montarias", (bool)Static(NpcMontApi, "IsAvailable"));
 
             var key = Static(MontSettings, "MenuKey") as BepInEx.Configuration.ConfigEntry<BepInEx.Configuration.KeyboardShortcut>;
-            Check("api/tecla-menu-U", key != null && key.Value.MainKey == KeyCode.U, key?.Value.ToString());
+            // 0.3.27: sem tecla por padrao (o menu abre pela Central Deadheim).
+            Check("api/tecla-menu-vazia", key != null && key.Value.MainKey == KeyCode.None, key?.Value.ToString());
 
             Static(MontApi, "RequestLocalState");
             yield return Until(() => (bool)Static(MontApi, "LocalKnown"), 15f);
