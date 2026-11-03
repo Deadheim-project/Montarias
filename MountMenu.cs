@@ -153,6 +153,7 @@ namespace ValheimMontarias
         {
             // Only when opening: once open, Menu.IsVisible answers yes for this very window.
             if (Player.m_localPlayer == null || (!_open && BusyElsewhere())) return;
+            Pets.PetMenu.Close();
             if (tab == Tab.Admin && !Access.IsAdmin())
             {
                 Player.m_localPlayer.Message(MessageHud.MessageType.Center, "Apenas administradores.");
@@ -945,7 +946,7 @@ namespace ValheimMontarias
             return string.IsNullOrEmpty(value) ? fallback : value;
         }
 
-        private static bool Typing()
+        internal static bool Typing()
         {
             if ((Chat.instance != null && Chat.instance.HasFocus()) || Console.IsVisible() ||
                 (TextInput.instance != null && TextInput.IsVisible()))
@@ -962,7 +963,7 @@ namespace ValheimMontarias
             return input && input.isFocused;
         }
 
-        private static bool BusyElsewhere()
+        internal static bool BusyElsewhere()
         {
             if (Typing() || Menu.IsVisible()) return true;
             var player = Player.m_localPlayer;

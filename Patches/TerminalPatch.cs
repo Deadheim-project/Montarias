@@ -12,6 +12,10 @@ namespace ValheimMontarias.Patches
             {
                 MountMenu.Open();
             });
+            _ = new Terminal.ConsoleCommand("pets", "Opens the pet menu", args =>
+            {
+                Pets.PetMenu.Open();
+            });
             _ = new Terminal.ConsoleCommand("montarias_fotos", "[id ...] (admin) photographs the rider on each mount", args =>
             {
                 var ids = new System.Collections.Generic.List<string>();

@@ -275,6 +275,8 @@ namespace ValheimMontarias
                 "So admin: tecla que abre a aba de admin das montarias. Vazio = sem tecla (abre em ESC > Deadheim > Admin).");
             PhotosKey = plugin.Config.Bind("Geral", "AtalhoFotos", KeyboardShortcut.Empty,
                 "So admin: tecla do teste de fotos das montarias (era Ctrl+F9). Vazio = sem tecla; o comando montarias_fotos continua.");
+
+            Pets.PetSettings.Init(plugin, sync);
         }
 
         /// <summary>The riding skill level that lets you fly: a flying mount asks for it by default.</summary>
