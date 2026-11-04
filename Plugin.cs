@@ -124,7 +124,7 @@ namespace ValheimMontarias
                 MountPhotos.Run(null);
             // Tecla do pet (sem tecla por padrao): invoca/guarda o pet ativo.
             if (Pets.PetSettings.QuickKey != null && Pets.PetSettings.QuickKey.Value.IsDown()
-                && Player.m_localPlayer != null && !MountMenu.Typing() && !Console.IsVisible() && !Menu.IsVisible())
+                && Player.m_localPlayer != null && !Pets.PetMenu.Capturing && !MountMenu.Typing() && !Console.IsVisible() && !Menu.IsVisible())
                 Pets.PetBridge.ToggleQuick();
             AdminMenu.Tick();
             MountControl.Tick(Player.m_localPlayer);

@@ -28,7 +28,13 @@ namespace ValheimMontarias.Pets
             MenuKey = plugin.Config.Bind("Pets", "AtalhoMenuPets", KeyboardShortcut.Empty,
                 "Tecla que abre o menu de pets. Vazio = sem tecla (use o console: pets, ou a Central Deadheim).");
             QuickKey = plugin.Config.Bind("Pets", "AtalhoPet", KeyboardShortcut.Empty,
-                "Tecla que invoca/guarda o pet ativo rapidamente (invoca o último pet usado). Vazio = sem tecla.");
+                "Tecla que invoca/guarda o pet ativo rapidamente (invoca o último pet usado). Vazio = sem tecla. Também se escolhe no menu de pets.");
+        }
+
+        /// <summary>Grava o cfg do jogador na hora (a tecla escolhida no menu sobrevive a um crash).</summary>
+        public static void Save()
+        {
+            try { QuickKey?.ConfigFile.Save(); } catch { }
         }
 
         private static ConfigEntry<T> Bind<T>(BaseUnityPlugin plugin, ConfigSync sync, string group, string name, T value, string description)
