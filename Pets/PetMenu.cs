@@ -1,3 +1,4 @@
+using BepInEx.Configuration;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -29,6 +30,11 @@ namespace ValheimMontarias.Pets
         private string _lastBuffPet = "";
         private float _nextRefresh;
         private string _signature = "";
+        private bool _capturing;
+        private static KeyCode[] _allKeys;
+
+        /// <summary>Esperando o jogador apertar a tecla do pet (o atalho não deve disparar nesse momento).</summary>
+        public static bool Capturing => _instance != null && _instance._open && _instance._capturing;
 
         public static bool IsOpen => _instance != null && _instance._open;
 
@@ -75,6 +81,12 @@ namespace ValheimMontarias.Pets
             if (Player.m_localPlayer.IsDead() || Console.IsVisible())
             {
                 CloseInternal();
+                return;
+            }
+
+            if (_capturing)
+            {
+                CaptureKey();
                 return;
             }
 
@@ -128,6 +140,7 @@ namespace ValheimMontarias.Pets
         {
             if (!_open) return;
             _open = false;
+            _capturing = false;
             _list = _detail = null;
             _status = null;
             if (_canvas != null) Destroy(_canvas);
@@ -180,10 +193,66 @@ namespace ValheimMontarias.Pets
             ValheimUi.Anchor(_detail, Vector2.zero, Vector2.one, new Vector2(332f, 0f), Vector2.zero);
         }
 
+        private static string KeyName()
+        {
+            var entry = PetSettings.QuickKey;
+            if (entry == null || entry.Value.MainKey == KeyCode.None) return "nenhuma";
+            var sb = new System.Text.StringBuilder();
+            foreach (var m in entry.Value.Modifiers) sb.Append(ModName(m)).Append(" + ");
+            var k = entry.Value.MainKey;
+            sb.Append(k >= KeyCode.Alpha0 && k <= KeyCode.Alpha9 ? ((int)(k - KeyCode.Alpha0)).ToString() : k.ToString());
+            return sb.ToString();
+        }
+
+        private static string ModName(KeyCode m)
+        {
+            switch (m)
+            {
+                case KeyCode.LeftShift: case KeyCode.RightShift: return "Shift";
+                case KeyCode.LeftControl: case KeyCode.RightControl: return "Ctrl";
+                default: return "Alt";
+            }
+        }
+
+        private static bool IsModifier(KeyCode k) =>
+            k == KeyCode.LeftShift || k == KeyCode.RightShift || k == KeyCode.LeftControl || k == KeyCode.RightControl ||
+            k == KeyCode.LeftAlt || k == KeyCode.RightAlt || k == KeyCode.AltGr ||
+            k == KeyCode.LeftCommand || k == KeyCode.RightCommand || k == KeyCode.LeftWindows || k == KeyCode.RightWindows;
+
+        /// <summary>Captura a próxima tecla: Esc cancela, Backspace/Delete desliga a tecla.</summary>
+        private void CaptureKey()
+        {
+            if (!Input.anyKeyDown) return;
+            if (_allKeys == null) _allKeys = (KeyCode[])System.Enum.GetValues(typeof(KeyCode));
+            foreach (var k in _allKeys)
+            {
+                if (k == KeyCode.None || IsModifier(k) || k >= KeyCode.Mouse0 || !Input.GetKeyDown(k)) continue;
+                _capturing = false;
+                if (k == KeyCode.Escape) { Say("Tecla mantida."); Redraw(true); return; }
+                if (k == KeyCode.Backspace || k == KeyCode.Delete)
+                {
+                    PetSettings.QuickKey.Value = KeyboardShortcut.Empty;
+                    Say("Tecla do pet desligada.");
+                }
+                else
+                {
+                    var mods = new List<KeyCode>();
+                    if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) mods.Add(KeyCode.LeftShift);
+                    if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) mods.Add(KeyCode.LeftControl);
+                    if (Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt)) mods.Add(KeyCode.LeftAlt);
+                    PetSettings.QuickKey.Value = new KeyboardShortcut(k, mods.ToArray());
+                    Say("Tecla do pet: " + KeyName() + ".");
+                }
+                PetSettings.Save();
+                Redraw(true);
+                return;
+            }
+        }
+
         private static string HintText()
         {
             string quick = PetSettings.QuickKey != null && PetSettings.QuickKey.Value.MainKey != KeyCode.None
-                ? PetSettings.QuickKey.Value.ToString() : null;
+                ? KeyName() : null;
             return (quick != null ? quick + " invoca/guarda o pet  ·  " : "") +
                    "Use o item do pet no inventário para desbloquear  ·  Esc fecha";
         }
@@ -211,7 +280,8 @@ namespace ValheimMontarias.Pets
         {
             var sb = new System.Text.StringBuilder();
             sb.Append(_focus).Append('|').Append(active).Append('|')
-              .Append(PetSettings.BuffsEnabled == null || PetSettings.BuffsEnabled.Value ? '1' : '0');
+              .Append(PetSettings.BuffsEnabled == null || PetSettings.BuffsEnabled.Value ? '1' : '0')
+              .Append('|').Append(_capturing ? "cap" : KeyName());
             foreach (var id in ids) sb.Append('|').Append(id).Append(':').Append((int)StateOf(id, active));
             return sb.ToString();
         }
@@ -307,6 +377,16 @@ namespace ValheimMontarias.Pets
                 ValheimUi.Anchor((RectTransform)hint.transform, new Vector2(0f, 0f), new Vector2(1f, 0f),
                     new Vector2(16f, 64f), new Vector2(-16f, 120f));
             }
+
+            var keyButton = ValheimUi.CreateButton(_detail, _capturing ? "Aperte a tecla..." : "Tecla: " + KeyName(), 220f, 40f, 16);
+            ValheimUi.Anchor((RectTransform)keyButton.transform, new Vector2(0f, 0f), new Vector2(0f, 0f),
+                new Vector2(16f, 16f), new Vector2(236f, 56f));
+            keyButton.onClick.AddListener(() =>
+            {
+                _capturing = !_capturing;
+                Say(_capturing ? "Aperte a tecla para invocar/guardar o pet. Esc cancela, Backspace desliga." : HintText());
+                Redraw(true);
+            });
 
             if (state == State.Active || state == State.Unlocked)
             {
