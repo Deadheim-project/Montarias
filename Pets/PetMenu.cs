@@ -28,6 +28,7 @@ namespace ValheimMontarias.Pets
         private string _lastActive;
         private string _lastBuffPet = "";
         private float _nextRefresh;
+        private string _signature = "";
 
         public static bool IsOpen => _instance != null && _instance._open;
 
@@ -83,12 +84,13 @@ namespace ValheimMontarias.Pets
                 return;
             }
 
-            // O estado do pet muda por RPC (resposta do servidor): redesenha ao mudar ou a cada 1 s.
+            // O estado do pet muda por RPC (resposta do servidor): consulta a cada 0,25 s, mas só
+            // redesenha (destrói/recria a lista) se o estado visível mudou, senão cliques se perdem.
             string active = PetBridge.ActiveId();
             if (active != _lastActive || Time.unscaledTime > _nextRefresh)
             {
                 _lastActive = active;
-                _nextRefresh = Time.unscaledTime + 1f;
+                _nextRefresh = Time.unscaledTime + 0.25f;
                 Redraw();
             }
         }
@@ -115,6 +117,7 @@ namespace ValheimMontarias.Pets
             if (_canvas == null) return;
             BuildWindow();
             _open = true;
+            _signature = "";
             _lastActive = PetBridge.ActiveId();
             _nextRefresh = Time.unscaledTime + 1f;
             if (string.IsNullOrEmpty(_focus)) _focus = _lastActive.Length > 0 ? _lastActive : FirstId();
@@ -204,12 +207,25 @@ namespace ValheimMontarias.Pets
             }
         }
 
-        private void Redraw()
+        private string ComputeSignature(string active, string[] ids)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.Append(_focus).Append('|').Append(active).Append('|')
+              .Append(PetSettings.BuffsEnabled == null || PetSettings.BuffsEnabled.Value ? '1' : '0');
+            foreach (var id in ids) sb.Append('|').Append(id).Append(':').Append((int)StateOf(id, active));
+            return sb.ToString();
+        }
+
+        private void Redraw(bool force = false)
         {
             if (!_open || _list == null || _detail == null) return;
             string active = PetBridge.ActiveId();
             var ids = PetBridge.CatalogIds();
             if (string.IsNullOrEmpty(_focus) && ids.Length > 0) _focus = ids[0];
+
+            string sig = ComputeSignature(active, ids);
+            if (!force && sig == _signature) return;
+            _signature = sig;
 
             Clear(_list);
             foreach (var id in ids)
@@ -217,7 +233,7 @@ namespace ValheimMontarias.Pets
                 string petId = id;
                 var state = StateOf(petId, active);
                 var row = ValheimUi.CreateButton(_list, "", 0f, 64f, 16);
-                row.onClick.AddListener(() => { _focus = petId; Redraw(); });
+                row.onClick.AddListener(() => { _focus = petId; Redraw(true); });
                 if (row.image != null)
                     row.image.color = petId == _focus ? Color.white : new Color(0.72f, 0.72f, 0.72f, 1f);
 
