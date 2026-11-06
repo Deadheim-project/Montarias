@@ -8,7 +8,7 @@ namespace ValheimMontarias.Patches
     /// </summary>
     internal static class UiInputPatches
     {
-        private static bool MenuOpen => MountMenu.IsOpen || AdminMenu.IsOpen;
+        private static bool MenuOpen => MountMenu.IsOpen || AdminMenu.IsOpen || Pets.PetMenu.IsOpen;
 
         [HarmonyPatch(typeof(Menu), nameof(Menu.IsVisible))]
         internal static class Menu_IsVisible_Patch
