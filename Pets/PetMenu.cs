@@ -57,6 +57,21 @@ namespace ValheimMontarias.Pets
         public static void Open() => _instance?.OpenInternal();
         public static void Close() => _instance?.CloseInternal();
 
+        // Inventory.Changed ficou não-público (e com parâmetros) no Valheim 1.0: chamar por reflexão.
+        private static readonly System.Reflection.MethodInfo _invChanged =
+            HarmonyLib.AccessTools.Method(typeof(Inventory), "Changed");
+        private static readonly object[] _invChangedArgs = BuildChangedArgs();
+
+        private static object[] BuildChangedArgs()
+        {
+            var ps = _invChanged?.GetParameters();
+            if (ps == null) return null;
+            var args = new object[ps.Length];
+            for (int i = 0; i < ps.Length; i++)
+                args[i] = ps[i].ParameterType == typeof(bool) ? (object)(i == 0) : null; // (success: true, cheatedStateChanged: false)
+            return args;
+        }
+
         private void Update()
         {
             if (Player.m_localPlayer == null)
@@ -74,7 +89,8 @@ namespace ValheimMontarias.Pets
             if (buffPet != _lastBuffPet)
             {
                 _lastBuffPet = buffPet;
-                Player.m_localPlayer.GetInventory()?.Changed();
+                var inv = Player.m_localPlayer.GetInventory();
+                if (inv != null) _invChanged?.Invoke(inv, _invChangedArgs);
             }
 
             if (!_open) return;
