@@ -43,6 +43,13 @@ namespace ValheimMontarias.Patches
         private static bool Prefix(Humanoid __instance, ItemDrop.ItemData item)
         {
             if (!(__instance is Player player) || player != Player.m_localPlayer) return true;
+            // Item de resgate "Montaria: X" (drop): consome e desbloqueia a montaria.
+            var dropName = item?.m_dropPrefab != null ? item.m_dropPrefab.name : null;
+            if (dropName != null && dropName.StartsWith(MountSettings.ContractPrefix, System.StringComparison.Ordinal))
+            {
+                RiderClient.Redeem(dropName.Substring(MountSettings.ContractPrefix.Length));
+                return false;
+            }
             if (!WhistleItem.IsWhistle(item)) return true;
             MountControl.UseMountItem(player, item);
             return false;

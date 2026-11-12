@@ -16,7 +16,7 @@ namespace ValheimMontarias
     {
         public const string Guid = "com.valheimmontarias.mod";
         public const string Name = "ValheimMontarias";
-        public const string Version = "0.3.28";
+        public const string Version = "0.3.29";
 
         internal static ManualLogSource Log;
         private Harmony _harmony;
@@ -126,6 +126,7 @@ namespace ValheimMontarias
             if (Pets.PetSettings.QuickKey != null && Pets.PetSettings.QuickKey.Value.IsDown()
                 && Player.m_localPlayer != null && !Pets.PetMenu.Capturing && !MountMenu.Typing() && !Console.IsVisible() && !Menu.IsVisible())
                 Pets.PetBridge.ToggleQuick();
+            MountBinds.Tick(Player.m_localPlayer);
             AdminMenu.Tick();
             MountControl.Tick(Player.m_localPlayer);
         }

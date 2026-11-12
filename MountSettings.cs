@@ -276,8 +276,18 @@ namespace ValheimMontarias
             PhotosKey = plugin.Config.Bind("Geral", "AtalhoFotos", KeyboardShortcut.Empty,
                 "So admin: tecla do teste de fotos das montarias (era Ctrl+F9). Vazio = sem tecla; o comando montarias_fotos continua.");
 
+            RedeemEnabled = Bind(plugin, sync, "Geral", "ResgatarItemMontaria", true,
+                "Deixa o jogador consumir o item \"Montaria: X\" (drop de criaturas e chefes) para ganhar a montaria. " +
+                "O servidor não enxerga o inventário do cliente: o item é conferido só no cliente.");
+
+            MountBinds.Init(plugin);
             Pets.PetSettings.Init(plugin, sync);
         }
+
+        /// <summary>Item de resgate (consumível) de uma montaria: Montaria_&lt;id&gt;.</summary>
+        public const string ContractPrefix = "Montaria_";
+
+        public static ConfigEntry<bool> RedeemEnabled;
 
         /// <summary>The riding skill level that lets you fly: a flying mount asks for it by default.</summary>
         public const int FlightRank = 4;

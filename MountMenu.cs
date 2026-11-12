@@ -57,7 +57,11 @@ namespace ValheimMontarias
         private int _seenRevision = -1;
         private int _seenMessage;
 
+        // 0 = nada, 1 = capturando a tecla terrestre, 2 = a voadora
+        private int _capturing;
+
         public static bool IsOpen => _instance != null && _instance._open;
+        public static bool Capturing => _instance != null && _instance._open && _instance._capturing != 0;
         public static bool AdminTabOpen => IsOpen && _instance._tab == Tab.Admin;
 
         public static void EnsureCreated()
@@ -136,6 +140,18 @@ namespace ValheimMontarias
                 Say(RiderClient.LastMessage);
             }
 
+            if (_capturing != 0)
+            {
+                string done = MountBinds.Capture(_capturing == 2);
+                if (done != null)
+                {
+                    _capturing = 0;
+                    Redraw();
+                    Say(done);
+                }
+                return;
+            }
+
             if (!Typing() && Input.GetKeyDown(KeyCode.Escape))
                 CloseInternal();
         }
@@ -191,6 +207,7 @@ namespace ValheimMontarias
         {
             if (!_open) return;
             _open = false;
+            _capturing = 0;
             _tab = Tab.Journal;
             _tabs.Clear();
             _journalRoot = _journalList = _journalDetail = null;
@@ -415,12 +432,17 @@ namespace ValheimMontarias
                 });
             }
 
+            // Bind no estilo dos pets: a montaria vira a terrestre (ou a voadora) chamada pela tecla.
+            bool owned = MountRoster.Owns(profile);
+            if (owned)
+                AddBindRow(_journalDetail, profile);
+
             string blocker = MountRoster.Blocker(profile);
             if (blocker != null)
             {
                 var hint = ValheimUi.CreateLabel(_journalDetail, blocker, 15, ValheimUi.Muted, TextAlignmentOptions.TopLeft);
                 ValheimUi.Anchor((RectTransform)hint.transform, new Vector2(0f, 0f), new Vector2(1f, 0f),
-                    new Vector2(16f, 64f), new Vector2(-16f, 120f));
+                    new Vector2(16f, owned ? 112f : 64f), new Vector2(-16f, owned ? 168f : 120f));
                 return;
             }
 
@@ -453,6 +475,40 @@ namespace ValheimMontarias
             {
                 AddCosmeticSection(_journalDetail, profile);
             }
+        }
+
+        /// <summary>Segunda fileira de baixo: bindar como terrestre/voadora e a tecla dessa categoria.</summary>
+        private void AddBindRow(RectTransform parent, MountProfile profile)
+        {
+            bool fly = profile.Flies;
+            string kind = fly ? "voadora" : "terrestre";
+            bool bound = MountBinds.IsBound(profile);
+
+            var bind = ValheimUi.CreateButton(parent, bound ? $"Bindada ({kind}) ✓" : $"Bindar {kind}", 200f, 40f, 16);
+            ValheimUi.Anchor((RectTransform)bind.transform, new Vector2(0f, 0f), new Vector2(0f, 0f),
+                new Vector2(16f, 64f), new Vector2(216f, 104f));
+            bind.onClick.AddListener(() =>
+            {
+                MountBinds.Toggle(profile);
+                Say(MountBinds.IsBound(profile)
+                    ? $"{profile.Name} bindada como montaria {kind}."
+                    : $"{profile.Name} desbindada.");
+                RebuildJournal();
+            });
+
+            bool capturing = _capturing == (fly ? 2 : 1);
+            var key = ValheimUi.CreateButton(parent,
+                capturing ? "Aperte a tecla..." : $"Tecla {kind}: {MountBinds.KeyName(fly)}", 260f, 40f, 16);
+            ValheimUi.Anchor((RectTransform)key.transform, new Vector2(0f, 0f), new Vector2(0f, 0f),
+                new Vector2(224f, 64f), new Vector2(484f, 104f));
+            key.onClick.AddListener(() =>
+            {
+                _capturing = capturing ? 0 : (fly ? 2 : 1);
+                Say(_capturing != 0
+                    ? $"Aperte a tecla para invocar/desmontar a montaria {kind}. Esc cancela, Backspace desliga."
+                    : HintText());
+                RebuildJournal();
+            });
         }
 
         private void AddCosmeticSection(RectTransform parent, MountProfile profile)
@@ -570,10 +626,11 @@ namespace ValheimMontarias
         private static string StateOf(MountProfile profile, MountProfile selected)
         {
             if (!MountRoster.Known) return "Consultando o servidor...";
-            if (!MountRoster.Owns(profile)) return "Não possui · à venda no Mestre das Montarias";
-            if (!MountRoster.CanRide(profile)) return $"Exige {RidingRanks.NameOf(profile.MinRank)}";
-            if (!MountRoster.BossDone(profile)) return $"Exige o passe de {MountRoster.BossName(profile)}";
-            return profile == selected ? "Selecionada · pronta" : "Pronta";
+            if (!MountRoster.Owns(profile)) return "Não possui · à venda no Mestre das Montarias ou drop de criaturas";
+            string tag = MountBinds.IsBound(profile) ? (profile.Flies ? " · Voadora ✓" : " · Terrestre ✓") : "";
+            if (!MountRoster.CanRide(profile)) return $"Exige {RidingRanks.NameOf(profile.MinRank)}{tag}";
+            if (!MountRoster.BossDone(profile)) return $"Exige o passe de {MountRoster.BossName(profile)}{tag}";
+            return (profile == selected ? "Selecionada · pronta" : "Pronta") + tag;
         }
 
         private static bool IsSummoned(MountProfile profile) =>

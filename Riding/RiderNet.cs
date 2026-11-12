@@ -34,6 +34,9 @@ namespace ValheimMontarias
         /// own, subject to the VIP gate in MountSettings.MountNameVipOnly/MountSkinVipOnly.
         /// Argument: "mountId\n&lt;new value&gt;" (empty value clears it).</summary>
         internal const string ActionSetName = "set-name";
+
+        /// <summary>Jogador gastou o item "Montaria: X": pede a montaria. Argumento: o id.</summary>
+        internal const string ActionRedeem = "redeem";
         internal const string ActionSetSkin = "set-skin";
 
         private static ZRoutedRpc _registered;
@@ -98,6 +101,26 @@ namespace ValheimMontarias
             {
                 if (RiderServer.TryLoad(key, out var record)) SendState(sender, record, null);
                 else SendMessage(sender, "Sua ficha de montarias está ilegível no servidor. Fale com um admin.");
+                return;
+            }
+
+            if (action == ActionRedeem)
+            {
+                // O item é consumido no cliente (o servidor não vê o inventário); aqui só
+                // se concede a montaria, que fica sendo do personagem para sempre.
+                if (MountSettings.RedeemEnabled != null && !MountSettings.RedeemEnabled.Value)
+                {
+                    SendMessage(sender, "Resgate de montarias desativado neste servidor.");
+                    return;
+                }
+                var redeemed = MountSettings.ById((argument ?? "").Trim());
+                if (redeemed == null || redeemed.AllowedSteamIds != null)
+                {
+                    SendMessage(sender, "Esta montaria não pode ser resgatada.");
+                    return;
+                }
+                string refusal2 = RiderServer.GrantMount(sender, redeemed.Id, "item de resgate");
+                SendMessage(sender, refusal2 ?? $"{redeemed.Name} desbloqueada! Ela está na lista de montarias.");
                 return;
             }
 
@@ -322,9 +345,66 @@ namespace ValheimMontarias
             foreach (var id in OwnedMounts)
             {
                 if (before.Contains(id)) continue;
+                // Resgate pelo item: o servidor concedeu, agora o item some do inventário.
+                if (_pendingRedeem == id && Time.realtimeSinceStartup < _pendingUntil)
+                {
+                    _pendingRedeem = null;
+                    ConsumeContract(player, id);
+                }
                 var profile = MountSettings.ById(id);
                 if (profile != null && !Prefabs.WhistleItem.Has(player, profile))
                     Prefabs.WhistleItem.GiveTo(player, profile);
+            }
+        }
+
+        private static string _pendingRedeem;
+        private static float _pendingUntil;
+
+        /// <summary>O jogador usou o item "Montaria_&lt;id&gt;": pede ao servidor. O item só é
+        /// gasto quando a montaria chega na lista (Apply), nunca se o servidor recusar.</summary>
+        internal static void Redeem(string id)
+        {
+            if (!Known)
+            {
+                Request(true);
+                Player.m_localPlayer?.Message(MessageHud.MessageType.Center,
+                    "Consultando o servidor, tente de novo em instantes.");
+                return;
+            }
+            var profile = MountSettings.ById(id);
+            if (profile == null)
+            {
+                Player.m_localPlayer?.Message(MessageHud.MessageType.Center, "Este item de montaria não existe mais.");
+                return;
+            }
+            if (Owns(id))
+            {
+                Player.m_localPlayer?.Message(MessageHud.MessageType.Center,
+                    $"Você já possui {profile.Name}. O item não foi gasto.");
+                return;
+            }
+            if (Time.realtimeSinceStartup < _pendingUntil) return;
+            _pendingRedeem = id;
+            _pendingUntil = Time.realtimeSinceStartup + 5f;
+            if (!RiderNet.Send(RiderNet.ActionRedeem, id))
+            {
+                _pendingRedeem = null;
+                Player.m_localPlayer?.Message(MessageHud.MessageType.Center, "O pedido não chegou ao servidor.");
+            }
+        }
+
+        private static void ConsumeContract(Player player, string id)
+        {
+            var inventory = player?.GetInventory();
+            if (inventory == null) return;
+            string prefab = MountSettings.ContractPrefix + id;
+            foreach (var item in inventory.GetAllItems())
+            {
+                if (item?.m_dropPrefab != null && item.m_dropPrefab.name == prefab)
+                {
+                    inventory.RemoveOneItem(item);
+                    return;
+                }
             }
         }
 
