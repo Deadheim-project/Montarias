@@ -20,6 +20,11 @@ namespace ValheimMontarias.Pets
         public const string Metal = "metal";
         public const string Pickup = "coleta";
         public const string Craft = "oficio";
+        // PvE: só valem contra criaturas (jogador e criatura domada ficam de fora, então não mexem no PvP).
+        public const string DamagePve = "danopve";
+        public const string DefensePve = "defesapve";
+        public const string LifeSteal = "roubovida";
+        public const string Vigor = "vigorpve";
 
         // Um bônus diferente para cada pet, sem repetir.
         public const string DefaultTable =
@@ -28,14 +33,20 @@ namespace ValheimMontarias.Pets
             "leitao=madeira:25," +
             "wolf_cub=metal:15," +
             "lox_cub=peso:5," +
-            "corvo=oficio:15";
+            "corvo=oficio:15," +
+            "foca=defesapve:8," +
+            "ursinho=danopve:8," +
+            "gaivota=roubovida:3," +
+            "veado=vigorpve:3";
 
         public const string KeysHelp =
             "peso (capacidade de carga +%), descanso (tempo de Descansado +%), madeira (peso da madeira -%), " +
             "metal (peso de minério/metal/pedra -%), coleta (alcance de coleta automática +%), " +
-            "oficio (ganho de habilidade de ofício +%)";
+            "oficio (ganho de habilidade de ofício +%), danopve (dano contra criaturas +%), " +
+            "defesapve (dano recebido de criaturas -%), roubovida (% do dano causado em criaturas vira vida), " +
+            "vigorpve (cada golpe em criatura recupera esta stamina)";
 
-        private static readonly string[] Order = { Weight, Rested, Wood, Metal, Pickup, Craft };
+        private static readonly string[] Order = { Weight, Rested, Wood, Metal, Pickup, Craft, DamagePve, DefensePve, LifeSteal, Vigor };
 
         // petId -> (bônus -> %)
         private static Dictionary<string, Dictionary<string, float>> _table;
@@ -104,12 +115,16 @@ namespace ValheimMontarias.Pets
             string n = v.ToString("0.#", CultureInfo.InvariantCulture);
             switch (key)
             {
-                case Weight: return $"+{n}% de capacidade de peso";
-                case Rested: return $"+{n}% de duração do Descansado";
-                case Wood: return $"-{n}% de peso da madeira";
-                case Metal: return $"-{n}% de peso de minério, metal e pedra";
-                case Pickup: return $"+{n}% de alcance para recolher itens do chão";
-                case Craft: return $"+{n}% de ganho de habilidade de ofício (lenha, mineração, pesca, cultivo, cozinha, criação)";
+                case Weight: return L.T("+{0}% de capacidade de peso", "+{0}% carry weight", n);
+                case Rested: return L.T("+{0}% de duração do Descansado", "+{0}% Rested duration", n);
+                case Wood: return L.T("-{0}% de peso da madeira", "-{0}% wood weight", n);
+                case Metal: return L.T("-{0}% de peso de minério, metal e pedra", "-{0}% ore, metal and stone weight", n);
+                case Pickup: return L.T("+{0}% de alcance para recolher itens do chão", "+{0}% item pickup range", n);
+                case Craft: return L.T("+{0}% de ganho de skill de ofício", "+{0}% crafting skill gain", n);
+                case DamagePve: return L.T("+{0}% de dano contra criaturas (PvE)", "+{0}% damage against creatures (PvE)", n);
+                case DefensePve: return L.T("-{0}% de dano recebido de criaturas (PvE)", "-{0}% damage taken from creatures (PvE)", n);
+                case LifeSteal: return L.T("{0}% do dano causado em criaturas vira vida (PvE)", "{0}% of damage dealt to creatures heals you (PvE)", n);
+                case Vigor: return L.T("Cada golpe em criatura recupera {0} de stamina (PvE)", "Each hit on a creature restores {0} stamina (PvE)", n);
                 default: return key;
             }
         }
@@ -198,6 +213,38 @@ namespace ValheimMontarias.Pets
                         if (p > 0f) factor *= 1f + p / 100f;
                         break;
                 }
+            }
+        }
+
+        // ---- PvE: dano causado. Roda no cliente do atacante, antes do golpe virar RPC. ----
+        [HarmonyPatch(typeof(Character), nameof(Character.Damage))]
+        private static class DamagePvePatch
+        {
+            private static void Prefix(Character __instance, HitData hit)
+            {
+                if (hit == null || __instance == null || __instance.IsPlayer() || __instance.IsTamed()) return;
+                if (hit.GetAttacker() != Player.m_localPlayer) return;
+                float p = Percent(DamagePve);
+                if (p > 0f) hit.m_damage.Modify(1f + p / 100f);
+                float steal = Percent(LifeSteal);
+                if (steal > 0f && Player.m_localPlayer != null)
+                    Player.m_localPlayer.Heal(hit.GetTotalDamage() * steal / 100f, true);
+                float vigor = Percent(Vigor);
+                if (vigor > 0f && Player.m_localPlayer != null) Player.m_localPlayer.AddStamina(vigor);
+            }
+        }
+
+        // ---- PvE: dano recebido. RPC_Damage roda no dono da vítima, o cliente do próprio jogador. ----
+        [HarmonyPatch(typeof(Character), "RPC_Damage")]
+        private static class DefensePvePatch
+        {
+            private static void Prefix(Character __instance, HitData hit)
+            {
+                if (hit == null || !IsLocal(__instance as Player)) return;
+                Character attacker = hit.GetAttacker();
+                if (attacker == null || attacker.IsPlayer() || attacker.IsTamed()) return;
+                float p = Percent(DefensePve);
+                if (p > 0f) hit.m_damage.Modify(Mathf.Max(0f, 1f - p / 100f));
             }
         }
 

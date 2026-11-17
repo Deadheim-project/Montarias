@@ -65,9 +65,31 @@ namespace ValheimMontarias
 
         public static string NameOf(int level)
         {
-            if (level <= 0) return "nenhuma";
+            if (level <= 0) return L.T("nenhuma", "none");
             var rank = Get(level);
-            return rank != null ? rank.Name : $"Nível {level}";
+            return rank != null ? Display(rank.Name) : L.T("Nível {0}", "Level {0}", level);
+        }
+
+        /// <summary>Nome do nível no idioma do jogo (só os nomes padrão são traduzidos; os editados ficam como estão).</summary>
+        public static string DisplayAll(string text)
+        {
+            if (L.Portugues) return text;
+            foreach (var n in new[] { "Montaria Aprendiz", "Montaria Experiente", "Montaria Mestre", "Montaria Voadora" })
+                text = text.Replace(n, Display(n));
+            return text;
+        }
+
+        public static string Display(string name)
+        {
+            if (L.Portugues) return name;
+            switch (name)
+            {
+                case "Montaria Aprendiz": return "Apprentice Riding";
+                case "Montaria Experiente": return "Experienced Riding";
+                case "Montaria Mestre": return "Master Riding";
+                case "Montaria Voadora": return "Flying Riding";
+                default: return name;
+            }
         }
 
         /// <summary>Speed multiplier of a level; levels past the list keep the last one's.</summary>

@@ -83,7 +83,7 @@ namespace ValheimMontarias.Prefabs
             }
 
             ItemDrop.DropItem(data, 1, player.transform.position + Vector3.up, Quaternion.identity);
-            player.Message(MessageHud.MessageType.Center, $"Inventário cheio: {data.m_shared.m_name} caiu no chão");
+            player.Message(MessageHud.MessageType.Center, L.T("Inventário cheio: {0} caiu no chão", "Inventory full: {0} dropped on the ground", data.m_shared.m_name));
             return true;
         }
 

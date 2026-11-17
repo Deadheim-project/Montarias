@@ -79,19 +79,19 @@ namespace ValheimMontarias
         /// <summary>Why a mount cannot be summoned right now, or null when it can.</summary>
         public static string Blocker(MountProfile profile)
         {
-            if (profile == null) return "Você ainda não possui nenhuma montaria. Procure o Mestre das Montarias.";
+            if (profile == null) return L.T("Você ainda não possui nenhuma montaria. Procure o Mestre das Montarias.", "You do not own any mount yet. Find the Mount Master.");
             if (!AllowedForLocalPlayer(profile))
-                return $"{profile.Name} está disponível apenas para SteamIDs autorizados.";
-            if (!Known) return "Consultando o servidor, tente de novo em instantes.";
-            if (!Owns(profile)) return $"Você não possui {profile.Name}. Procure o Mestre das Montarias.";
+                return L.T("{0} está disponível apenas para SteamIDs autorizados.", "{0} is only available to authorized SteamIDs.", profile.Name);
+            if (!Known) return L.T("Consultando o servidor, tente de novo em instantes.", "Asking the server, try again in a moment.");
+            if (!Owns(profile)) return L.T("Você não possui {0}. Procure o Mestre das Montarias.", "You do not own {0}. Find the Mount Master.", profile.Name);
             if (!CanRide(profile))
-                return $"{profile.Name} exige a habilidade {RidingRanks.NameOf(profile.MinRank)}. Aprenda com o Mestre das Montarias.";
+                return L.T("{0} exige a habilidade {1}. Aprenda com o Mestre das Montarias.", "{0} requires the skill {1}. Learn from the Mount Master.", profile.Name, RidingRanks.NameOf(profile.MinRank));
             if (!string.IsNullOrEmpty(profile.Boss) && !BossPassBridge.Known)
-                return "Consultando os passes no servidor, tente de novo em instantes.";
+                return L.T("Consultando os passes no servidor, tente de novo em instantes.", "Asking the server for passes, try again in a moment.");
             if (!BossDone(profile))
             {
                 BossPassBridge.Request();
-                return $"{profile.Name} exige o passe de {BossName(profile)}: derrote o chefe ou compre o passe no Mestre dos Passes.";
+                return L.T("{0} exige o passe de {1}: derrote o chefe ou compre o passe no Mestre dos Passes.", "{0} requires the {1} pass: defeat the boss or buy the pass from the Pass Master.", profile.Name, BossName(profile));
             }
             return null;
         }

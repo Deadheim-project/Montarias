@@ -136,7 +136,7 @@ namespace ValheimMontarias.Pets
             if (_open || Player.m_localPlayer == null || MountMenu.IsOpen || MountMenu.BusyElsewhere()) return;
             if (!PetBridge.Available)
             {
-                Player.m_localPlayer.Message(MessageHud.MessageType.Center, "Os pets vêm do mod Deadheim, que não está carregado.");
+                Player.m_localPlayer.Message(MessageHud.MessageType.Center, L.T("Os pets vêm do mod Deadheim, que não está carregado.", "Pets come from the Deadheim mod, which is not loaded."));
                 return;
             }
             if (!ValheimUi.EnsureAssets()) return;
@@ -184,7 +184,7 @@ namespace ValheimMontarias.Pets
             titleBar.gameObject.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0f);
             titleBar.gameObject.AddComponent<DragWindow>().Target = panel;
 
-            var title = ValheimUi.CreateLabel(titleBar, "Pets", 30, ValheimUi.Orange, TextAlignmentOptions.Center, display: true);
+            var title = ValheimUi.CreateLabel(titleBar, L.T("Pets", "Pets"), 30, ValheimUi.Orange, TextAlignmentOptions.Center, display: true);
             ValheimUi.Stretch((RectTransform)title.transform, 60f, 10f);
 
             var close = ValheimUi.CreateButton(panel, "X", 36f, 36f, 18);
@@ -212,7 +212,7 @@ namespace ValheimMontarias.Pets
         private static string KeyName()
         {
             var entry = PetSettings.QuickKey;
-            if (entry == null || entry.Value.MainKey == KeyCode.None) return "nenhuma";
+            if (entry == null || entry.Value.MainKey == KeyCode.None) return L.T("nenhuma", "none");
             var sb = new System.Text.StringBuilder();
             foreach (var m in entry.Value.Modifiers) sb.Append(ModName(m)).Append(" + ");
             var k = entry.Value.MainKey;
@@ -244,11 +244,11 @@ namespace ValheimMontarias.Pets
             {
                 if (k == KeyCode.None || IsModifier(k) || k >= KeyCode.Mouse0 || !Input.GetKeyDown(k)) continue;
                 _capturing = false;
-                if (k == KeyCode.Escape) { Say("Tecla mantida."); Redraw(true); return; }
+                if (k == KeyCode.Escape) { Say(L.T("Tecla mantida.", "Key kept.")); Redraw(true); return; }
                 if (k == KeyCode.Backspace || k == KeyCode.Delete)
                 {
                     PetSettings.QuickKey.Value = KeyboardShortcut.Empty;
-                    Say("Tecla do pet desligada.");
+                    Say(L.T("Tecla do pet desligada.", "Pet key cleared."));
                 }
                 else
                 {
@@ -257,7 +257,7 @@ namespace ValheimMontarias.Pets
                     if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) mods.Add(KeyCode.LeftControl);
                     if (Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt)) mods.Add(KeyCode.LeftAlt);
                     PetSettings.QuickKey.Value = new KeyboardShortcut(k, mods.ToArray());
-                    Say("Tecla do pet: " + KeyName() + ".");
+                    Say(L.T("Tecla do pet: ", "Pet key: ") + KeyName() + ".");
                 }
                 PetSettings.Save();
                 Redraw(true);
@@ -269,8 +269,8 @@ namespace ValheimMontarias.Pets
         {
             string quick = PetSettings.QuickKey != null && PetSettings.QuickKey.Value.MainKey != KeyCode.None
                 ? KeyName() : null;
-            return (quick != null ? quick + " invoca/guarda o pet  ·  " : "") +
-                   "Use o item do pet no inventário para desbloquear  ·  Esc fecha";
+            return (quick != null ? quick + L.T(" invoca/guarda o pet  ·  ", " summons/stores the pet  ·  ") : "") +
+                   L.T("Use o item do pet no inventário para desbloquear  ·  Esc fecha", "Use the pet item in your inventory to unlock  ·  Esc closes");
         }
 
         private enum State { Active, Unlocked, Item, Locked }
@@ -285,10 +285,10 @@ namespace ValheimMontarias.Pets
         {
             switch (s)
             {
-                case State.Active: return "Ativo";
-                case State.Unlocked: return "Desbloqueado";
-                case State.Item: return "Item no inventário: use para desbloquear";
-                default: return "Bloqueado";
+                case State.Active: return L.T("Ativo", "Active");
+                case State.Unlocked: return L.T("Desbloqueado", "Unlocked");
+                case State.Item: return L.T("Item no inventário: use para desbloquear", "Item in inventory: use it to unlock");
+                default: return L.T("Bloqueado", "Locked");
             }
         }
 
@@ -372,20 +372,20 @@ namespace ValheimMontarias.Pets
             var lines = PetBuffs.Describe(id);
             string buffText;
             if (PetSettings.BuffsEnabled != null && !PetSettings.BuffsEnabled.Value)
-                buffText = "Os bônus de pet estão desligados neste servidor.";
+                buffText = L.T("Os bônus de pet estão desligados neste servidor.", "Pet bonuses are disabled on this server.");
             else if (lines.Count == 0)
-                buffText = "Este pet é só companhia: não dá bônus.";
+                buffText = L.T("Este pet é só companhia: não dá bônus.", "This pet is just company: it gives no bonus.");
             else
-                buffText = "<color=#ffa13c>Bônus com o pet ativo</color>\n• " + string.Join("\n• ", lines) +
-                           "\n<size=13><color=#9a9188>Não valem em arena nem durante raids, onde o pet fica oculto.</color></size>";
+                buffText = "<color=#ffa13c>" + L.T("Bônus com o pet ativo", "Bonuses with the active pet") + "</color>\n• " + string.Join("\n• ", lines) +
+                           "\n<size=13><color=#9a9188>" + L.T("Não valem em arena nem durante raids, onde o pet fica oculto.", "They do not apply in the arena or during raids, where the pet is hidden.") + "</color></size>";
             var buffs = ValheimUi.CreateLabel(_detail, buffText, 17, ValheimUi.Beige, TextAlignmentOptions.TopLeft);
             ValheimUi.Anchor((RectTransform)buffs.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(172f, -270f), new Vector2(-16f, -92f));
 
             string note = state == State.Item
-                ? "Use o item do pet no inventário: ele é consumido e o pet fica desbloqueado para sempre."
+                ? L.T("Use o item do pet no inventário: ele é consumido e o pet fica desbloqueado para sempre.", "Use the pet item in your inventory: it is consumed and the pet is unlocked forever.")
                 : state == State.Locked
-                    ? "Consiga o item deste pet (drops de monstros e Aesir) e use-o para desbloquear."
+                    ? L.T("Consiga o item deste pet (drops de monstros e Aesir) e use-o para desbloquear.", "Get this pet's item (monster drops and Aesir) and use it to unlock.")
                     : "";
             if (note.Length > 0)
             {
@@ -394,27 +394,27 @@ namespace ValheimMontarias.Pets
                     new Vector2(16f, 64f), new Vector2(-16f, 120f));
             }
 
-            var keyButton = ValheimUi.CreateButton(_detail, _capturing ? "Aperte a tecla..." : "Tecla: " + KeyName(), 220f, 40f, 16);
+            var keyButton = ValheimUi.CreateButton(_detail, _capturing ? L.T("Aperte a tecla...", "Press a key...") : L.T("Tecla: ", "Key: ") + KeyName(), 220f, 40f, 16);
             ValheimUi.Anchor((RectTransform)keyButton.transform, new Vector2(0f, 0f), new Vector2(0f, 0f),
                 new Vector2(16f, 16f), new Vector2(236f, 56f));
             keyButton.onClick.AddListener(() =>
             {
                 _capturing = !_capturing;
-                Say(_capturing ? "Aperte a tecla para invocar/guardar o pet. Esc cancela, Backspace desliga." : HintText());
+                Say(_capturing ? L.T("Aperte a tecla para invocar/guardar o pet. Esc cancela, Backspace desliga.", "Press a key to summon/store the pet. Esc cancels, Backspace clears.") : HintText());
                 Redraw(true);
             });
 
             if (state == State.Active || state == State.Unlocked)
             {
                 bool isActive = state == State.Active;
-                var button = ValheimUi.CreateButton(_detail, isActive ? "Guardar" : "Invocar", 150f, 40f, 16);
+                var button = ValheimUi.CreateButton(_detail, isActive ? L.T("Guardar", "Store") : L.T("Invocar", "Summon"), 150f, 40f, 16);
                 ValheimUi.Anchor((RectTransform)button.transform, new Vector2(1f, 0f), new Vector2(1f, 0f),
                     new Vector2(-166f, 16f), new Vector2(-16f, 56f));
                 button.onClick.AddListener(() =>
                 {
                     if (isActive) PetBridge.Dismiss();
                     else PetBridge.Activate(id);
-                    Say(isActive ? "Pet guardado." : "Pedido enviado: o pet já aparece.");
+                    Say(isActive ? L.T("Pet guardado.", "Pet stored.") : L.T("Pedido enviado: o pet já aparece.", "Request sent: the pet will appear shortly."));
                 });
             }
         }

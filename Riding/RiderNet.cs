@@ -263,7 +263,7 @@ namespace ValheimMontarias
             }
 
             if (!string.IsNullOrEmpty(message))
-                RiderClient.Tell(message);
+                RiderClient.Tell(L.Server(message));
         }
     }
 
@@ -368,19 +368,19 @@ namespace ValheimMontarias
             {
                 Request(true);
                 Player.m_localPlayer?.Message(MessageHud.MessageType.Center,
-                    "Consultando o servidor, tente de novo em instantes.");
+                    L.T("Consultando o servidor, tente de novo em instantes.", "Asking the server, try again in a moment."));
                 return;
             }
             var profile = MountSettings.ById(id);
             if (profile == null)
             {
-                Player.m_localPlayer?.Message(MessageHud.MessageType.Center, "Este item de montaria não existe mais.");
+                Player.m_localPlayer?.Message(MessageHud.MessageType.Center, L.T("Este item de montaria não existe mais.", "This mount item no longer exists."));
                 return;
             }
             if (Owns(id))
             {
                 Player.m_localPlayer?.Message(MessageHud.MessageType.Center,
-                    $"Você já possui {profile.Name}. O item não foi gasto.");
+                    L.T("Você já possui {0}. O item não foi gasto.", "You already own {0}. The item was not consumed.", profile.Name));
                 return;
             }
             if (Time.realtimeSinceStartup < _pendingUntil) return;
@@ -389,7 +389,7 @@ namespace ValheimMontarias
             if (!RiderNet.Send(RiderNet.ActionRedeem, id))
             {
                 _pendingRedeem = null;
-                Player.m_localPlayer?.Message(MessageHud.MessageType.Center, "O pedido não chegou ao servidor.");
+                Player.m_localPlayer?.Message(MessageHud.MessageType.Center, L.T("O pedido não chegou ao servidor.", "The request did not reach the server."));
             }
         }
 

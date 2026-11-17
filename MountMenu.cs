@@ -172,7 +172,7 @@ namespace ValheimMontarias
             Pets.PetMenu.Close();
             if (tab == Tab.Admin && !Access.IsAdmin())
             {
-                Player.m_localPlayer.Message(MessageHud.MessageType.Center, "Apenas administradores.");
+                Player.m_localPlayer.Message(MessageHud.MessageType.Center, L.T("Apenas administradores.", "Admins only."));
                 if (!_open) return;
                 tab = Tab.Journal;
             }
@@ -237,7 +237,7 @@ namespace ValheimMontarias
             titleBar.gameObject.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0f);
             titleBar.gameObject.AddComponent<DragWindow>().Target = panel;
 
-            var title = ValheimUi.CreateLabel(titleBar, "Montarias", 30, ValheimUi.Orange,
+            var title = ValheimUi.CreateLabel(titleBar, L.T("Montarias", "Mounts"), 30, ValheimUi.Orange,
                 TextAlignmentOptions.Center, display: true);
             ValheimUi.Stretch((RectTransform)title.transform, 60f, 10f);
 
@@ -265,8 +265,8 @@ namespace ValheimMontarias
                 new Vector2(26f, 14f), new Vector2(-26f, 44f));
 
             _tabs.Clear();
-            AddTab("Montarias", Tab.Journal);
-            AddTab("Habilidade", Tab.Skill);
+            AddTab(L.T("Montarias", "Mounts"), Tab.Journal);
+            AddTab(L.T("Habilidade", "Skill"), Tab.Skill);
             if (Access.IsAdmin())
                 AddTab("Admin", Tab.Admin);
 
@@ -286,7 +286,7 @@ namespace ValheimMontarias
         {
             if (tab == Tab.Admin && !Access.IsAdmin())
             {
-                Say("Apenas administradores.");
+                Say(L.T("Apenas administradores.", "Admins only."));
                 tab = Tab.Journal;
             }
 
@@ -405,14 +405,14 @@ namespace ValheimMontarias
 
             float bonus = MountRoster.SpeedBonus;
             var stats = ValheimUi.CreateLabel(_journalDetail,
-                $"Habilidade exigida: {RidingRanks.NameOf(profile.MinRank)}\n" +
-                (string.IsNullOrEmpty(profile.Boss) ? "" : $"Passe exigido: {MountRoster.BossName(profile)}\n") +
-                (profile.Flies ? "Voa: Espaço decola e sobe, Ctrl desce e pousa.\n" : "") +
-                $"Velocidade: {Value(profile.RunSpeed) * bonus:0.#}" +
-                (bonus > 1.001f ? $" <color=#9a9188>(+{(bonus - 1f) * 100f:0}% da sua habilidade)</color>" : "") + "\n" +
-                $"Conjuração: {Mathf.Max(0.1f, Value(profile.CastSeconds) * MountRoster.CastMultiplier):0.#}s" +
-                (MountRoster.CastMultiplier < 0.999f ? $" <color=#9a9188>(-{(1f - MountRoster.CastMultiplier) * 100f:0}% da sua habilidade)</color>" : "") + "\n" +
-                "Use o item da montaria para montar; o item ou H para descer.",
+                L.T("Habilidade exigida: {0}\n", "Required skill: {0}\n", RidingRanks.NameOf(profile.MinRank)) +
+                (string.IsNullOrEmpty(profile.Boss) ? "" : L.T("Passe exigido: {0}\n", "Required pass: {0}\n", MountRoster.BossName(profile))) +
+                (profile.Flies ? L.T("Voa: Espaço decola e sobe, Ctrl desce e pousa.\n", "Flies: Space takes off and climbs, Ctrl descends and lands.\n") : "") +
+                L.T("Velocidade: ", "Speed: ") + $"{Value(profile.RunSpeed) * bonus:0.#}" +
+                (bonus > 1.001f ? $" <color=#9a9188>(+{(bonus - 1f) * 100f:0}% " + L.T("da sua habilidade", "from your skill") + ")</color>" : "") + "\n" +
+                L.T("Conjuração: ", "Casting: ") + $"{Mathf.Max(0.1f, Value(profile.CastSeconds) * MountRoster.CastMultiplier):0.#}s" +
+                (MountRoster.CastMultiplier < 0.999f ? $" <color=#9a9188>(-{(1f - MountRoster.CastMultiplier) * 100f:0}% " + L.T("da sua habilidade", "from your skill") + ")</color>" : "") + "\n" +
+                L.T("Use o item da montaria para montar; o item ou H para descer.", "Use the mount item to mount; the item or H to dismount."),
                 15, ValheimUi.Beige, TextAlignmentOptions.TopLeft);
             ValheimUi.Anchor((RectTransform)stats.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(192f, -200f), new Vector2(-16f, -92f));
@@ -421,13 +421,13 @@ namespace ValheimMontarias
             // another one here if theirs was lost. It does nothing for anyone who does not own it.
             if (MountRoster.Owns(profile) && !WhistleItem.Has(Player.m_localPlayer, profile))
             {
-                var take = ValheimUi.CreateButton(_journalDetail, "Pegar o item", 150f, 40f, 16);
+                var take = ValheimUi.CreateButton(_journalDetail, L.T("Pegar o item", "Take item"), 150f, 40f, 16);
                 ValheimUi.Anchor((RectTransform)take.transform, new Vector2(0f, 0f), new Vector2(0f, 0f),
                     new Vector2(16f, 16f), new Vector2(166f, 56f));
                 take.onClick.AddListener(() =>
                 {
                     if (WhistleItem.GiveTo(Player.m_localPlayer, profile))
-                        Say("Item da montaria no inventário: use-o para montar.");
+                        Say(L.T("Item da montaria no inventário: use-o para montar.", "Mount item added to your inventory: use it to mount."));
                     RebuildJournal();
                 });
             }
@@ -446,7 +446,7 @@ namespace ValheimMontarias
                 return;
             }
 
-            var summon = ValheimUi.CreateButton(_journalDetail, IsSummoned(profile) ? "Desmontar" : "Montar", 150f, 40f, 16);
+            var summon = ValheimUi.CreateButton(_journalDetail, IsSummoned(profile) ? L.T("Desmontar", "Dismount") : L.T("Montar", "Mount"), 150f, 40f, 16);
             ValheimUi.Anchor((RectTransform)summon.transform, new Vector2(1f, 0f), new Vector2(1f, 0f),
                 new Vector2(-166f, 16f), new Vector2(-16f, 56f));
             summon.onClick.AddListener(() =>
@@ -457,14 +457,14 @@ namespace ValheimMontarias
 
             bool isSelected = profile == selected;
             var choose = ValheimUi.CreateButton(_journalDetail,
-                isSelected ? "Selecionada" : "Selecionar", 170f, 40f, 16);
+                isSelected ? L.T("Selecionada", "Selected") : L.T("Selecionar", "Select"), 170f, 40f, 16);
             ValheimUi.Anchor((RectTransform)choose.transform, new Vector2(1f, 0f), new Vector2(1f, 0f),
                 new Vector2(-344f, 16f), new Vector2(-174f, 56f));
             choose.interactable = !isSelected;
             choose.onClick.AddListener(() =>
             {
                 Select(profile);
-                Say($"{profile.Name} selecionada.");
+                Say(L.T("{0} selecionada.", "{0} selected.", profile.Name));
             });
 
             // Aesir 28/30: cosmetic controls (name and skin) -- shown only when the feature
@@ -481,31 +481,31 @@ namespace ValheimMontarias
         private void AddBindRow(RectTransform parent, MountProfile profile)
         {
             bool fly = profile.Flies;
-            string kind = fly ? "voadora" : "terrestre";
+            string kind = fly ? L.T("voadora", "flying") : L.T("terrestre", "ground");
             bool bound = MountBinds.IsBound(profile);
 
-            var bind = ValheimUi.CreateButton(parent, bound ? $"Bindada ({kind}) ✓" : $"Bindar {kind}", 200f, 40f, 16);
+            var bind = ValheimUi.CreateButton(parent, bound ? L.T("Bindada ({0}) ✓", "Bound ({0}) ✓", kind) : L.T("Bindar {0}", "Bind {0}", kind), 200f, 40f, 16);
             ValheimUi.Anchor((RectTransform)bind.transform, new Vector2(0f, 0f), new Vector2(0f, 0f),
                 new Vector2(16f, 64f), new Vector2(216f, 104f));
             bind.onClick.AddListener(() =>
             {
                 MountBinds.Toggle(profile);
                 Say(MountBinds.IsBound(profile)
-                    ? $"{profile.Name} bindada como montaria {kind}."
-                    : $"{profile.Name} desbindada.");
+                    ? L.T("{0} bindada como montaria {1}.", "{0} bound as {1} mount.", profile.Name, kind)
+                    : L.T("{0} desbindada.", "{0} unbound.", profile.Name));
                 RebuildJournal();
             });
 
             bool capturing = _capturing == (fly ? 2 : 1);
             var key = ValheimUi.CreateButton(parent,
-                capturing ? "Aperte a tecla..." : $"Tecla {kind}: {MountBinds.KeyName(fly)}", 260f, 40f, 16);
+                capturing ? L.T("Aperte a tecla...", "Press a key...") : L.T("Tecla {0}: {1}", "{0} key: {1}", kind, MountBinds.KeyName(fly)), 260f, 40f, 16);
             ValheimUi.Anchor((RectTransform)key.transform, new Vector2(0f, 0f), new Vector2(0f, 0f),
                 new Vector2(224f, 64f), new Vector2(484f, 104f));
             key.onClick.AddListener(() =>
             {
                 _capturing = capturing ? 0 : (fly ? 2 : 1);
                 Say(_capturing != 0
-                    ? $"Aperte a tecla para invocar/desmontar a montaria {kind}. Esc cancela, Backspace desliga."
+                    ? L.T("Aperte a tecla para invocar/desmontar a montaria {0}. Esc cancela, Backspace desliga.", "Press a key to summon/dismiss the {0} mount. Esc cancels, Backspace clears.", kind)
                     : HintText());
                 RebuildJournal();
             });
@@ -514,7 +514,7 @@ namespace ValheimMontarias
         private void AddCosmeticSection(RectTransform parent, MountProfile profile)
         {
             // Separator label
-            var sep = ValheimUi.CreateLabel(parent, "— Cosméticos (Aesir) —", 14,
+            var sep = ValheimUi.CreateLabel(parent, L.T("— Cosméticos (Aesir) —", "— Cosmetics (Aesir) —"), 14,
                 ValheimUi.Orange, TextAlignmentOptions.Center, display: true);
             ValheimUi.Anchor((RectTransform)sep.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(16f, -230f), new Vector2(-16f, -210f));
@@ -523,7 +523,7 @@ namespace ValheimMontarias
             if (MountSettings.MountNameActive?.Value ?? false)
             {
                 var nameLabel = ValheimUi.CreateLabel(parent,
-                    $"Nome: {(string.IsNullOrEmpty(RiderClient.NameOf(profile.Id)) ? "<cor padrão>" : RiderClient.NameOf(profile.Id))}",
+                    L.T("Nome: ", "Name: ") + (string.IsNullOrEmpty(RiderClient.NameOf(profile.Id)) ? L.T("<cor padrão>", "<default color>") : RiderClient.NameOf(profile.Id)),
                     13, ValheimUi.Beige, TextAlignmentOptions.Left);
                 ValheimUi.Anchor((RectTransform)nameLabel.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
                     new Vector2(16f, -258f), new Vector2(-16f, -234f));
@@ -551,18 +551,18 @@ namespace ValheimMontarias
                 {
                     string argument = profile.Id + "\n" + nameField.text;
                     if (RiderNet.Send(RiderNet.ActionSetName, argument))
-                        Say("Pedido enviado ao servidor...");
+                        Say(L.T("Pedido enviado ao servidor...", "Request sent to the server..."));
                     else
-                        Say("O pedido não chegou ao servidor.");
+                        Say(L.T("O pedido não chegou ao servidor.", "The request did not reach the server."));
                 });
 
-                var nameClear = ValheimUi.CreateButton(nameRow, "Limpar", 70f, 34f, 13);
+                var nameClear = ValheimUi.CreateButton(nameRow, L.T("Limpar", "Clear"), 70f, 34f, 13);
                 nameClear.onClick.AddListener(() =>
                 {
                     if (RiderNet.Send(RiderNet.ActionSetName, profile.Id + "\n"))
-                        Say("Nome removido (pedido enviado).");
+                        Say(L.T("Nome removido (pedido enviado).", "Name removed (request sent)."));
                     else
-                        Say("O pedido não chegou ao servidor.");
+                        Say(L.T("O pedido não chegou ao servidor.", "The request did not reach the server."));
                 });
             }
 
@@ -573,7 +573,7 @@ namespace ValheimMontarias
                 if (skinOptions.Count > 1) // there is at least one non-Padrao skin
                 {
                     var skinLabel = ValheimUi.CreateLabel(parent,
-                        $"Skin: {(string.IsNullOrEmpty(RiderClient.SkinOf(profile.Id)) ? "Padrão" : RiderClient.SkinOf(profile.Id))}",
+                        "Skin: " + (string.IsNullOrEmpty(RiderClient.SkinOf(profile.Id)) ? L.T("Padrão", "Default") : RiderClient.SkinOf(profile.Id)),
                         13, ValheimUi.Beige, TextAlignmentOptions.Left);
                     ValheimUi.Anchor((RectTransform)skinLabel.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
                         new Vector2(16f, -316f), new Vector2(-16f, -302f));
@@ -614,9 +614,9 @@ namespace ValheimMontarias
                         {
                             string value = id == MountProfile.DefaultSkinId ? "" : id;
                             if (RiderNet.Send(RiderNet.ActionSetSkin, profile.Id + "\n" + value))
-                                Say("Skin enviada ao servidor...");
+                                Say(L.T("Skin enviada ao servidor...", "Skin sent to the server..."));
                             else
-                                Say("O pedido não chegou ao servidor.");
+                                Say(L.T("O pedido não chegou ao servidor.", "The request did not reach the server."));
                         });
                     }
                 }
@@ -625,12 +625,12 @@ namespace ValheimMontarias
 
         private static string StateOf(MountProfile profile, MountProfile selected)
         {
-            if (!MountRoster.Known) return "Consultando o servidor...";
-            if (!MountRoster.Owns(profile)) return "Não possui · à venda no Mestre das Montarias ou drop de criaturas";
-            string tag = MountBinds.IsBound(profile) ? (profile.Flies ? " · Voadora ✓" : " · Terrestre ✓") : "";
-            if (!MountRoster.CanRide(profile)) return $"Exige {RidingRanks.NameOf(profile.MinRank)}{tag}";
-            if (!MountRoster.BossDone(profile)) return $"Exige o passe de {MountRoster.BossName(profile)}{tag}";
-            return (profile == selected ? "Selecionada · pronta" : "Pronta") + tag;
+            if (!MountRoster.Known) return L.T("Consultando o servidor...", "Asking the server...");
+            if (!MountRoster.Owns(profile)) return L.T("Não possui · à venda no Mestre das Montarias ou drop de criaturas", "Not owned · sold by the Mount Master or dropped by creatures");
+            string tag = MountBinds.IsBound(profile) ? (profile.Flies ? L.T(" · Voadora ✓", " · Flying ✓") : L.T(" · Terrestre ✓", " · Ground ✓")) : "";
+            if (!MountRoster.CanRide(profile)) return L.T("Exige {0}", "Requires {0}", RidingRanks.NameOf(profile.MinRank)) + tag;
+            if (!MountRoster.BossDone(profile)) return L.T("Exige o passe de {0}", "Requires the {0} pass", MountRoster.BossName(profile)) + tag;
+            return (profile == selected ? L.T("Selecionada · pronta", "Selected · ready") : L.T("Pronta", "Ready")) + tag;
         }
 
         private static bool IsSummoned(MountProfile profile) =>
@@ -649,7 +649,7 @@ namespace ValheimMontarias
 
             var pane = ValheimUi.CreateInlay(root, "Levels");
             ValheimUi.Anchor(pane, Vector2.zero, Vector2.one, new Vector2(0f, 48f), new Vector2(0f, -40f));
-            var header = ValheimUi.CreateLabel(pane, "Habilidade de Montaria", 18, ValheimUi.Orange,
+            var header = ValheimUi.CreateLabel(pane, L.T("Habilidade de Montaria", "Riding Skill"), 18, ValheimUi.Orange,
                 TextAlignmentOptions.Center, display: true);
             ValheimUi.Anchor((RectTransform)header.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(6f, -36f), new Vector2(-6f, -6f));
@@ -658,8 +658,9 @@ namespace ValheimMontarias
             _skillList = ValheimUi.CreateScrollList(area, spacing: 4f);
 
             var footer = ValheimUi.CreateLabel(root,
-                "Aprenda com o Mestre das Montarias. Cada montaria exige um nível; os níveis acima " +
-                "deixam todas as suas montarias mais rápidas.",
+                L.T("Aprenda com o Mestre das Montarias. Cada montaria exige um nível; os níveis acima " +
+                "deixam todas as suas montarias mais rápidas.", "Learn from the Mount Master. Each mount requires a level; higher levels " +
+                "make all your mounts faster."),
                 14, ValheimUi.Muted, TextAlignmentOptions.Center);
             ValheimUi.Anchor((RectTransform)footer.transform, Vector2.zero, new Vector2(1f, 0f),
                 Vector2.zero, new Vector2(0f, 42f));
@@ -673,24 +674,24 @@ namespace ValheimMontarias
 
             int rank = MountRoster.Rank;
             _skillSummary.text = !MountRoster.Known
-                ? "<color=#9a9188>Consultando o servidor...</color>"
+                ? "<color=#9a9188>" + L.T("Consultando o servidor...", "Asking the server...") + "</color>"
                 : rank <= 0
-                    ? "Você ainda não sabe montar."
-                    : $"<color=#9a9188>Sua habilidade:</color> {RidingRanks.NameOf(rank)} " +
-                      $"<color=#9a9188>(velocidade {RidingRanks.SpeedOf(rank) * 100f:0}%{CastText(RidingRanks.CastOf(rank))})</color>";
+                    ? L.T("Você ainda não sabe montar.", "You cannot ride yet.")
+                    : "<color=#9a9188>" + L.T("Sua habilidade:", "Your skill:") + $"</color> {RidingRanks.NameOf(rank)} " +
+                      "<color=#9a9188>(" + L.T("velocidade", "speed") + $" {RidingRanks.SpeedOf(rank) * 100f:0}%{CastText(RidingRanks.CastOf(rank))})</color>";
 
             foreach (var level in RidingRanks.All)
             {
                 var row = Row(_skillList, 52f);
                 ValheimUi.CreateItemIcon(row, SkillIcon, 36f);
                 var label = ValheimUi.CreateLabel(row,
-                    $"{level.Name}\n<size=12><color=#9a9188>velocidade {level.Speed * 100f:0}%{CastText(level.Cast)}</color></size>",
+                    $"{RidingRanks.Display(level.Name)}\n<size=12><color=#9a9188>" + L.T("velocidade", "speed") + $" {level.Speed * 100f:0}%{CastText(level.Cast)}</color></size>",
                     16, ValheimUi.Beige, TextAlignmentOptions.Left);
                 Flexible(label.gameObject);
 
                 bool learned = level.Level <= rank;
                 bool next = level.Level == rank + 1;
-                var tag = ValheimUi.CreateLabel(row, learned ? "Aprendida" : next ? "Próxima" : "Bloqueada", 15,
+                var tag = ValheimUi.CreateLabel(row, learned ? L.T("Aprendida", "Learned") : next ? L.T("Próxima", "Next") : L.T("Bloqueada", "Locked"), 15,
                     learned ? ValheimUi.Yellow : next ? ValheimUi.Orange : ValheimUi.Muted,
                     TextAlignmentOptions.Right);
                 ValheimUi.SetWidth(tag.gameObject, 140f);
@@ -773,45 +774,45 @@ namespace ValheimMontarias
                 Say("Nome atualizado.");
             });
 
-            AddStat("Velocidade", selected.RunSpeed, 3f, 30f);
-            AddStat("Pulo", selected.JumpHeight, 3f, 20f);
-            AddStat("Escala", selected.Scale, 0.5f, 3f);
-            AddChoice("Pose montado", selected.RidePose, MountSettings.RidePoses);
-            AddStat("Ajuste da sela: altura (m)", selected.SaddleUp, -2f, 2f);
-            AddStat("Ajuste da sela: frente (m)", selected.SaddleForward, -2f, 2f);
-            AddStat("Assento: recuo no lombo (m)", selected.SeatBack, -1.5f, 1.5f);
-            AddStat("Tamanho da sela (x)", selected.SaddleSize, 0.3f, 3f);
-            AddStat("Ajuste do personagem: altura (m)", selected.RiderUp, -2f, 2f);
-            AddStat("Ajuste do personagem: frente (m)", selected.RiderForward, -2f, 2f);
-            AddStat("Folga das pernas (m)", selected.LegGap, -0.2f, 0.5f);
-            AddStat("Pose: joelho à frente (graus)", selected.KneeForward, -30f, 90f);
-            AddStat("Pose: coxas abertas (graus)", selected.ThighOut, 0f, 85f);
-            AddStat("Pose: canela para trás (graus)", selected.ShinBack, -60f, 60f);
-            AddStat("Pose: inclinação do tronco (graus)", selected.Lean, -30f, 60f);
-            AddStat("Pose: mãos à frente (m)", selected.HandsForward, -1f, 1.5f);
-            AddStat("Pose: mãos acima do assento (m)", selected.HandsUp, -1f, 1.5f);
-            AddStat("Rotação da sela (graus)", selected.SaddleYRotation, -360f, 360f);
-            AddIntStat("Habilidade exigida (nível)", selected.RequiredRank, 1, Mathf.Max(1, RidingRanks.Count));
+            AddStat(L.T("Velocidade", "Speed"), selected.RunSpeed, 3f, 30f);
+            AddStat(L.T("Pulo", "Jump"), selected.JumpHeight, 3f, 20f);
+            AddStat(L.T("Escala", "Scale"), selected.Scale, 0.5f, 3f);
+            AddChoice(L.T("Pose montado", "Riding pose"), selected.RidePose, MountSettings.RidePoses);
+            AddStat(L.T("Ajuste da sela: altura (m)", "Saddle adjust: height (m)"), selected.SaddleUp, -2f, 2f);
+            AddStat(L.T("Ajuste da sela: frente (m)", "Saddle adjust: forward (m)"), selected.SaddleForward, -2f, 2f);
+            AddStat(L.T("Assento: recuo no lombo (m)", "Seat: back along the spine (m)"), selected.SeatBack, -1.5f, 1.5f);
+            AddStat(L.T("Tamanho da sela (x)", "Saddle size (x)"), selected.SaddleSize, 0.3f, 3f);
+            AddStat(L.T("Ajuste do personagem: altura (m)", "Rider adjust: height (m)"), selected.RiderUp, -2f, 2f);
+            AddStat(L.T("Ajuste do personagem: frente (m)", "Rider adjust: forward (m)"), selected.RiderForward, -2f, 2f);
+            AddStat(L.T("Folga das pernas (m)", "Leg gap (m)"), selected.LegGap, -0.2f, 0.5f);
+            AddStat(L.T("Pose: joelho à frente (graus)", "Pose: knee forward (deg)"), selected.KneeForward, -30f, 90f);
+            AddStat(L.T("Pose: coxas abertas (graus)", "Pose: thighs apart (deg)"), selected.ThighOut, 0f, 85f);
+            AddStat(L.T("Pose: canela para trás (graus)", "Pose: shin back (deg)"), selected.ShinBack, -60f, 60f);
+            AddStat(L.T("Pose: inclinação do tronco (graus)", "Pose: torso lean (deg)"), selected.Lean, -30f, 60f);
+            AddStat(L.T("Pose: mãos à frente (m)", "Pose: hands forward (m)"), selected.HandsForward, -1f, 1.5f);
+            AddStat(L.T("Pose: mãos acima do assento (m)", "Pose: hands above seat (m)"), selected.HandsUp, -1f, 1.5f);
+            AddStat(L.T("Rotação da sela (graus)", "Saddle rotation (deg)"), selected.SaddleYRotation, -360f, 360f);
+            AddIntStat(L.T("Habilidade exigida (nível)", "Required skill (level)"), selected.RequiredRank, 1, Mathf.Max(1, RidingRanks.Count));
 
-            var apply = ValheimUi.CreateButton(_adminEditor, "Aplicar stats", 0f, 42f, 15);
+            var apply = ValheimUi.CreateButton(_adminEditor, L.T("Aplicar stats", "Apply stats"), 0f, 42f, 15);
             apply.onClick.AddListener(() =>
             {
                 selected.ApplyAll?.Invoke();
-                Say("Ajustes aplicados.");
+                Say(L.T("Ajustes aplicados.", "Changes applied."));
             });
 
-            Heading("Minha ficha (no servidor)");
-            var grant = ValheimUi.CreateButton(_adminEditor, "Dar esta montaria a mim", 0f, 42f, 15);
+            Heading(L.T("Minha ficha (no servidor)", "My record (on the server)"));
+            var grant = ValheimUi.CreateButton(_adminEditor, L.T("Dar esta montaria a mim", "Give me this mount"), 0f, 42f, 15);
             grant.onClick.AddListener(() => AdminAction(RiderNet.ActionGrantMount, selected.Id));
-            var nextRank = ValheimUi.CreateButton(_adminEditor, "Aprender o próximo nível da habilidade", 0f, 42f, 15);
+            var nextRank = ValheimUi.CreateButton(_adminEditor, L.T("Aprender o próximo nível da habilidade", "Learn the next skill level"), 0f, 42f, 15);
             nextRank.onClick.AddListener(() => AdminAction(RiderNet.ActionNextRank, ""));
-            var reset = ValheimUi.CreateButton(_adminEditor, "Zerar minha habilidade e montarias", 0f, 42f, 15);
+            var reset = ValheimUi.CreateButton(_adminEditor, L.T("Zerar minha habilidade e montarias", "Reset my skill and mounts"), 0f, 42f, 15);
             reset.onClick.AddListener(() => AdminAction(RiderNet.ActionReset, ""));
         }
 
         private void AdminAction(string action, string argument)
         {
-            Say(RiderNet.Send(action, argument) ? "Pedido enviado ao servidor..." : "O pedido não chegou ao servidor.");
+            Say(RiderNet.Send(action, argument) ? L.T("Pedido enviado ao servidor...", "Request sent to the server...") : L.T("O pedido não chegou ao servidor.", "The request did not reach the server."));
         }
 
         private void AddStat(string label, ConfigEntry<float> entry, float min, float max)
@@ -827,7 +828,7 @@ namespace ValheimMontarias
                 if (!float.TryParse(field.text.Replace(',', '.'), NumberStyles.Float,
                         CultureInfo.InvariantCulture, out float value))
                 {
-                    Say("Valor inválido.");
+                    Say(L.T("Valor inválido.", "Invalid value."));
                     return;
                 }
                 entry.Value = Mathf.Clamp(value, min, max);
@@ -868,7 +869,7 @@ namespace ValheimMontarias
             {
                 if (!int.TryParse(field.text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int value))
                 {
-                    Say("Valor inválido.");
+                    Say(L.T("Valor inválido.", "Invalid value."));
                     return;
                 }
                 entry.Value = Mathf.Clamp(value, min, max);
@@ -913,7 +914,7 @@ namespace ValheimMontarias
 
         /// <summary>", conjuração -25%" for a level that shortens the cast, nothing otherwise.</summary>
         private static string CastText(float cast) =>
-            cast < 0.999f ? $", conjuração -{(1f - cast) * 100f:0}%" : "";
+            cast < 0.999f ? ", " + L.T("conjuração", "casting") + $" -{(1f - cast) * 100f:0}%" : "";
 
         private static void ClearChildren(RectTransform content)
         {
@@ -992,7 +993,7 @@ namespace ValheimMontarias
         private static string HintText()
         {
             string menu = MountSettings.MenuKeyName();
-            return $"{menu} abre/fecha  ·  Use o item para montar/desmontar  ·  Esc fecha";
+            return L.T("{0} abre/fecha  ·  Use o item para montar/desmontar  ·  Esc fecha", "{0} opens/closes  ·  Use the item to mount/dismount  ·  Esc closes", menu);
         }
 
         private static string Sanitize(string value, string fallback)

@@ -37,7 +37,7 @@ namespace ValheimMontarias.Patches
 
             if (!MountControl.IsOwner(__instance.gameObject, player))
             {
-                player.Message(MessageHud.MessageType.Center, "Este animal não é seu.");
+                player.Message(MessageHud.MessageType.Center, L.T("Este animal não é seu.", "This animal is not yours."));
                 __result = false;
                 return false;
             }

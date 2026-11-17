@@ -232,12 +232,62 @@ namespace ValheimMontarias.Prefabs
             }
         }
 
+        // Teleporte montado: o jogo move so o jogador (Player.UpdateTeleport faz transform.position
+        // = alvo) e nao solta o assento; a montaria (outro ZDO) fica para tras e o assento puxava o
+        // jogador de volta. Antes de teleportar desmonta, e depois que o teleporte acaba monta de novo.
+        private static string _resumePrefab;
+        private static float _resumeFrom;
+        private static float _resumeUntil;
+
+        /// <summary>Chamado antes de Player.TeleportTo: o cavaleiro desmonta e a montaria e invocada
+        /// de novo no destino, sem tempo de conjuracao.</summary>
+        internal static void BeforeTeleport(Player player)
+        {
+            if (player == null || player != Player.m_localPlayer || player.IsTeleporting()) return;
+            if (!TryGetRidden(player, out var ridden, out _, out _) || ridden == null) return;
+            if (!MountHub.IsOurs(ridden.gameObject)) return;
+            var profile = MountSettings.Find(ridden.gameObject) ?? MountSettings.Default;
+            string prefab = string.IsNullOrEmpty(profile.PrefabName) ? MountPrefab.PrefabName : profile.PrefabName;
+            Dismount(player);
+            _resumePrefab = prefab;
+            _resumeFrom = 0f;
+            _resumeUntil = Time.unscaledTime + 60f;
+        }
+
+        private static void TickResumeAfterTeleport(Player player)
+        {
+            if (_resumePrefab == null) return;
+            if (player == null || player.IsDead() || Time.unscaledTime > _resumeUntil)
+            {
+                _resumePrefab = null;
+                return;
+            }
+            if (player.IsTeleporting() || _pendingDespawn != null || _casting || IsRiding(player))
+            {
+                if (IsRiding(player)) _resumePrefab = null;
+                _resumeFrom = 0f;
+                return;
+            }
+            // Deixa o mundo do destino carregar um instante antes de criar a montaria.
+            if (_resumeFrom <= 0f) { _resumeFrom = Time.unscaledTime + 1f; return; }
+            if (Time.unscaledTime < _resumeFrom) return;
+            if (CombatLock.IsInCombat(player) || player.IsEncumbered() || player.IsSwimming() || BusyElsewhere(player))
+            {
+                _resumePrefab = null;
+                return;
+            }
+            _castPrefab = _resumePrefab;
+            _resumePrefab = null;
+            FinishSummon(player);
+        }
+
         public static void Tick(Player player)
         {
             FlushDespawn();
             TryFinishAutoMount();
             TickCast(player);
             if (player == null) return;
+            TickResumeAfterTeleport(player);
             ClearWhistleTargetMode(player);
             ClearOrphanedRide(player);
             DismountInWater(player);
@@ -250,7 +300,7 @@ namespace ValheimMontarias.Prefabs
             if (player.IsSwimming() || (mount != null && mount.IsSwimming() && !mount.IsFlying()))
             {
                 Dismount(player);
-                player.Message(MessageHud.MessageType.Center, "Você não pode montar na água.");
+                player.Message(MessageHud.MessageType.Center, L.T("Você não pode montar na água.", "You cannot mount in water."));
             }
         }
 
@@ -328,7 +378,7 @@ namespace ValheimMontarias.Prefabs
 
             if (_casting)
             {
-                CancelCast(player, "Invocação interrompida");
+                CancelCast(player, L.T("Invocação interrompida", "Summoning interrupted"));
                 return;
             }
 
@@ -345,7 +395,7 @@ namespace ValheimMontarias.Prefabs
 
             if (BusyElsewhere(player))
             {
-                player.Message(MessageHud.MessageType.Center, "Solte o que está controlando antes de invocar.");
+                player.Message(MessageHud.MessageType.Center, L.T("Solte o que está controlando antes de invocar.", "Let go of what you are controlling before summoning."));
                 return;
             }
 
@@ -389,7 +439,7 @@ namespace ValheimMontarias.Prefabs
             if (!_casting) return;
             if (player == null || player.IsDead() || CombatLock.IsInCombat(player) || player.IsEncumbered() || CastInterrupted(player))
             {
-                CancelCast(player, "Invocação interrompida");
+                CancelCast(player, L.T("Invocação interrompida", "Summoning interrupted"));
                 return;
             }
 
@@ -451,7 +501,7 @@ namespace ValheimMontarias.Prefabs
                 ?? (prefabName == MountPrefab.PrefabName ? MountPrefab.Prefab : null);
             if (prefab == null)
             {
-                player.Message(MessageHud.MessageType.Center, "A montaria ainda não está pronta.");
+                player.Message(MessageHud.MessageType.Center, L.T("A montaria ainda não está pronta.", "The mount is not ready yet."));
                 Plugin.Log.LogWarning($"ValheimMontarias: prefab missing at summon ({prefabName})");
                 return;
             }
@@ -520,7 +570,7 @@ namespace ValheimMontarias.Prefabs
             Despawn(go);
             if (player != null && !player.IsDead())
                 player.Message(MessageHud.MessageType.Center,
-                    CombatLock.IsInCombat(player) ? CombatLock.Message : player.IsEncumbered() ? CombatLock.HeavyMessage : "Não foi possível montar aqui.");
+                    CombatLock.IsInCombat(player) ? CombatLock.Message : player.IsEncumbered() ? CombatLock.HeavyMessage : L.T("Não foi possível montar aqui.", "You cannot mount here."));
         }
 
         /// <summary>
@@ -721,7 +771,7 @@ namespace ValheimMontarias.Prefabs
             var sadle = go.GetComponentInChildren<Sadle>(true);
             if (sadle == null)
             {
-                player.Message(MessageHud.MessageType.Center, "Esta montaria ainda não tem sela.");
+                player.Message(MessageHud.MessageType.Center, L.T("Esta montaria ainda não tem sela.", "This mount has no saddle yet."));
                 return false;
             }
 
@@ -1127,16 +1177,16 @@ namespace ValheimMontarias.Prefabs
         public static string HoverText(GameObject go, Player player)
         {
             if (!IsOwner(go, player))
-                return "Montaria de outra pessoa";
+                return L.T("Montaria de outra pessoa", "Someone else's mount");
             if (CombatLock.IsInCombat(player))
-                return "Em combate: não é possível usar a montaria";
+                return L.T("Em combate: não é possível usar a montaria", "In combat: you cannot use the mount");
             if (Access.IsAdmin())
-                return "[<color=yellow><b>E</b></color>] Ajustes da montaria (admin)\n" +
-                    $"{MountSettings.MenuKeyName()} abre o menu";
+                return L.T("[<color=yellow><b>E</b></color>] Ajustes da montaria (admin)\n", "[<color=yellow><b>E</b></color>] Mount settings (admin)\n") +
+                    L.T("{0} abre o menu", "{0} opens the menu", MountSettings.MenuKeyName());
             var profile = MountSettings.Find(go);
             if (profile != null && profile.Flies)
-                return "O item da montaria ou H desmontam.\nMontado: Espaço decola e sobe, Ctrl desce e pousa, Shift voa mais rápido";
-            return "O item da montaria ou H desmontam.\nMontado: Espaço salta, Shift corre mais rápido";
+                return L.T("O item da montaria ou H desmontam.\nMontado: Espaço decola e sobe, Ctrl desce e pousa, Shift voa mais rápido", "The mount item or H dismounts.\nMounted: Space takes off and climbs, Ctrl descends and lands, Shift flies faster");
+            return L.T("O item da montaria ou H desmontam.\nMontado: Espaço salta, Shift corre mais rápido", "The mount item or H dismounts.\nMounted: Space jumps, Shift runs faster");
         }
     }
 }

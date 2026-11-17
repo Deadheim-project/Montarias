@@ -17,7 +17,7 @@ namespace ValheimMontarias
         // PvpFlags.Combat in Deadheim (Pvp/PvpState.cs).
         private const int DeadheimFlagCombat = 16;
 
-        public const string Message = "Você não pode usar montarias em combate.";
+        public static string Message => L.T("Você não pode usar montarias em combate.", "You cannot use mounts in combat.");
 
         public static bool IsInCombat(Player player)
         {
@@ -46,7 +46,7 @@ namespace ValheimMontarias
             return true;
         }
 
-        public const string HeavyMessage = "Você está pesado demais para montar.";
+        public static string HeavyMessage => L.T("Você está pesado demais para montar.", "You are too heavy to mount.");
 
         /// <summary>Over the carry limit (the game's own Encumbered state): no mounting.</summary>
         public static bool BlockHeavy(Player player)

@@ -75,7 +75,7 @@ namespace ValheimMontarias
             {
                 if (!MountRoster.Known) RiderClient.Request(true);
                 player.Message(MessageHud.MessageType.Center,
-                    fly ? "Você não tem nenhuma montaria voadora." : "Você não tem nenhuma montaria terrestre.");
+                    fly ? L.T("Você não tem nenhuma montaria voadora.", "You have no flying mount.") : L.T("Você não tem nenhuma montaria terrestre.", "You have no ground mount."));
                 return;
             }
             MountControl.TrySummonProfile(player, profile);
@@ -91,7 +91,7 @@ namespace ValheimMontarias
         public static string KeyName(bool fly)
         {
             var entry = KeyEntry(fly);
-            if (entry == null || entry.Value.MainKey == KeyCode.None) return "nenhuma";
+            if (entry == null || entry.Value.MainKey == KeyCode.None) return L.T("nenhuma", "none");
             var sb = new StringBuilder();
             foreach (var m in entry.Value.Modifiers) sb.Append(ModName(m)).Append(" + ");
             var k = entry.Value.MainKey;
@@ -124,12 +124,12 @@ namespace ValheimMontarias
             {
                 if (k == KeyCode.None || IsModifier(k) || k >= KeyCode.Mouse0 || !Input.GetKeyDown(k)) continue;
                 var entry = KeyEntry(fly);
-                if (k == KeyCode.Escape) return "Tecla mantida.";
+                if (k == KeyCode.Escape) return L.T("Tecla mantida.", "Key kept.");
                 if (k == KeyCode.Backspace || k == KeyCode.Delete)
                 {
                     entry.Value = KeyboardShortcut.Empty;
                     Save();
-                    return "Tecla desligada.";
+                    return L.T("Tecla desligada.", "Key cleared.");
                 }
                 var mods = new List<KeyCode>();
                 if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) mods.Add(KeyCode.LeftShift);
@@ -137,7 +137,7 @@ namespace ValheimMontarias
                 if (Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt)) mods.Add(KeyCode.LeftAlt);
                 entry.Value = new KeyboardShortcut(k, mods.ToArray());
                 Save();
-                return "Tecla " + (fly ? "voadora" : "terrestre") + ": " + KeyName(fly) + ".";
+                return L.T("Tecla ", "") + (fly ? L.T("voadora", "Flying") : L.T("terrestre", "Ground")) + L.T("", " key") + ": " + KeyName(fly) + ".";
             }
             return null;
         }
